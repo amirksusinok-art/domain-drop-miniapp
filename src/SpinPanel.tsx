@@ -52,6 +52,8 @@ export function SpinPanel({
       /* Selection is validated by the server. */
     }
   }
+  const deficit =
+    selected && !p.free_spin ? Math.max(0, selected.spinPrice - p.coins) : 0;
   return (
     <section
       className={
@@ -114,6 +116,7 @@ export function SpinPanel({
         </div>
       </div>
       <CardDecryption
+        selectedZone={selected?.name ?? "random"}
         result={state.pending}
         previous={previous}
         animating={rolling}
@@ -126,6 +129,23 @@ export function SpinPanel({
         onDone={onDone}
         onDetails={onDetails}
       />
+      <div
+        className="compact-luck"
+        aria-label={`Luck: ${selected?.pity ?? 0} из ${state.config.pityGuarantee}`}
+      >
+        <span>
+          LUCK ·{" "}
+          {selected && selected.rareChance >= 1
+            ? "RARE+ ГАРАНТИРОВАН"
+            : selected && selected.rareChance > selected.baseRareChance
+              ? "BOOSTED"
+              : "NORMAL"}
+        </span>
+        <progress
+          max={state.config.pityGuarantee}
+          value={selected?.pity ?? 0}
+        />
+      </div>
       {state.pending && !rolling ? (
         <div className="decrypt-result-actions">
           <div className="result-actions">
@@ -176,11 +196,13 @@ export function SpinPanel({
             }
           >
             <Zap size={20} />
-            {p.free_spin
-              ? "SPIN — FREE"
-              : selected
-                ? "SPIN — " + number(selected.spinPrice)
-                : "SPIN"}
+            {deficit > 0
+              ? "НУЖНО ЕЩЁ " + number(deficit) + " COINS"
+              : p.free_spin
+                ? "SPIN — FREE"
+                : selected
+                  ? "SPIN — " + number(selected.spinPrice)
+                  : "SPIN"}
             <ArrowRight size={18} />
           </button>
           {state.scanner && (

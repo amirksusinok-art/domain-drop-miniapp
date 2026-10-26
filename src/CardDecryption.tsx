@@ -25,6 +25,7 @@ export function CardDecryption({
   fast,
   sound,
   highValueThreshold,
+  selectedZone,
   onDone,
   onDetails,
 }: {
@@ -35,6 +36,7 @@ export function CardDecryption({
   fast: boolean;
   sound: boolean;
   highValueThreshold: number;
+  selectedZone: string;
   onDone: () => void;
   onDetails: () => void;
 }) {
@@ -55,7 +57,13 @@ export function CardDecryption({
       return;
     }
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timeline = revealTimeline(result, fast, reduced, !!previous);
+    const timeline = revealTimeline(
+      result,
+      fast,
+      reduced,
+      !!previous,
+      selectedZone !== "random",
+    );
     clock.current = { elapsed: 0, last: performance.now(), speed: 1, index: 0 };
     setFrame(timeline[0]);
     setAccelerated(false);
@@ -167,18 +175,20 @@ export function CardDecryption({
         : display
           ? maskedText(display.name, actual.nameLocked, tick)
           : "###";
+  const fixedZone = selectedZone !== "random" ? selectedZone : null;
   const zone =
-    (!animating && !result) || waiting
+    fixedZone ??
+    ((!animating && !result) || waiting
       ? "???"
       : destroying
         ? maskedText(previous.tld, 0, tick, true)
         : display
           ? maskedText(display.tld, actual.tldLocked, tick, true)
-          : "???";
+          : "???");
   const status = waiting
     ? "CONNECTING…"
     : !result && !animating
-      ? "AWAITING SPIN"
+      ? "ГОТОВО К SPIN"
       : {
           destroying: "RELEASING SIGNAL…",
           initializing: "INITIALIZING…",
@@ -229,9 +239,15 @@ export function CardDecryption({
         <button
           type="button"
           className="decrypt-surface"
-          onClick={accelerate}
-          disabled={!animating || accelerated}
-          aria-label="Ускорить раскрытие домена"
+          onClick={animating ? accelerate : onDetails}
+          disabled={animating ? accelerated : !result}
+          aria-label={
+            animating
+              ? "Ускорить раскрытие домена"
+              : result
+                ? `Почему ${result.name}.${result.tld} столько стоит`
+                : "Ожидание SPIN"
+          }
           aria-describedby="decryption-status"
         >
           <span
@@ -257,7 +273,7 @@ export function CardDecryption({
             ? `${result.name}.${result.tld}`
             : "Зашифрованная карточка домена"}
         </span>
-        <span className="sr-only" id="decryption-status" role="status">
+        <span className="decrypt-status" id="decryption-status" role="status">
           {status}
         </span>
         {rarityReady &&
@@ -295,7 +311,8 @@ export function CardDecryption({
                 onClick={onDetails}
                 disabled={animating}
               >
-                {number(result!.value)} <span>COINS</span>
+                <AnimatedPrice result={result!} enabled={animating} />{" "}
+                <span>COINS</span>
               </button>
               {result!.value >= highValueThreshold && (
                 <span className="high-value">
@@ -307,5 +324,45 @@ export function CardDecryption({
         </div>
       </div>
     </div>
+  );
+}
+
+// Visual only: actions always use the server value.
+function AnimatedPrice({
+  result,
+  enabled,
+}: {
+  result: Domain;
+  enabled: boolean;
+}) {
+  const eligible = useRef(enabled);
+  const seen = useRef<string | null>(null);
+  const [display, setDisplay] = useState(result.value);
+  useEffect(() => {
+    if (
+      !eligible.current ||
+      seen.current === result.id ||
+      result.value < 5000 ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setDisplay(result.value);
+      return;
+    }
+    seen.current = result.id;
+    const start = performance.now();
+    let handle = 0;
+    setDisplay(0);
+    const update = (now: number) => {
+      const progress = Math.min(1, (now - start) / 500);
+      setDisplay(Math.round(result.value * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) handle = requestAnimationFrame(update);
+    };
+    handle = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(handle);
+  }, [result.id]);
+  return (
+    <span aria-label={number(result.value)}>
+      <span aria-hidden="true">{number(display)}</span>
+    </span>
   );
 }

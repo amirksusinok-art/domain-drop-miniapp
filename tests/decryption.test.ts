@@ -94,3 +94,11 @@ test("Unknown TLD characters cannot suggest another real prize; locked text neve
   assert.equal(maskedText("777", 3, 99), "777");
   assert.equal(maskedText("online", 6, 1, true), "online");
 });
+
+test("Fixed TLD stays known throughout decryption without a secret-zone phase", () => {
+  const d = drop("RARE");
+  const frames = revealTimeline(d, false, false, false, true);
+  assert.ok(frames.every((f) => f.tldLocked === d.tld.length));
+  assert.ok(frames.every((f) => f.stage !== "tld" && f.stage !== "signal"));
+  assert.equal(frames.at(-1)?.stage, "ready");
+});

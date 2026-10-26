@@ -37,13 +37,7 @@ import type { Auction, Domain, State } from "../shared/types";
 import { rarities } from "../shared/types";
 import { api, authenticate, mutation } from "./api";
 import { setupTelegram } from "./telegram";
-import {
-  DomainCard,
-  Empty,
-  SectionTitle,
-  colors,
-  number,
-} from "./components";
+import { DomainCard, Empty, SectionTitle, colors, number } from "./components";
 type Action = (path: string, body?: unknown, animate?: boolean) => Promise<any>;
 function useLoad<T>(path: string, refresh: number) {
   const [data, setData] = useState<T | null>(null),
@@ -246,7 +240,7 @@ export function DomainModal({
       }}
     >
       <div className="modal-heading">
-        <span className="eyebrow">DOMAIN DETAILS</span>
+        <span className="eyebrow">ИНСПЕКТОР ДОМЕНА</span>
         <button className="icon-button" aria-label="Закрыть" onClick={close}>
           <X />
         </button>
@@ -267,7 +261,7 @@ export function DomainModal({
           <dd>{number(d.breakdown.base)}</dd>
         </div>
         <div>
-          <dt>TLD multiplier</dt>
+          <dt>.{d.tld.toUpperCase()}</dt>
           <dd>×{d.breakdown.tldMultiplier}</dd>
         </div>
         <div>

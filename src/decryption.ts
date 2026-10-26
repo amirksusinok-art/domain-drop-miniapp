@@ -24,6 +24,7 @@ export function revealTimeline(
   fast = false,
   reduced = false,
   reroll = false,
+  fixedZone = false,
 ): RevealFrame[] {
   if (reduced)
     return [
@@ -96,10 +97,13 @@ export function revealTimeline(
     ...(reroll
       ? [{ at: 0, stage: "destroying" as const, nameLocked: 0, tldLocked: 0 }]
       : []),
-    ...frames.map((f) => ({
-      ...f,
-      at: Math.round((f.at / at) * target) + offset,
-    })),
+    ...frames
+      .filter((f) => !fixedZone || !["signal", "tld"].includes(f.stage))
+      .map((f) => ({
+        ...f,
+        tldLocked: fixedZone ? domain.tld.length : f.tldLocked,
+        at: Math.round((f.at / at) * target) + offset,
+      })),
   ];
 }
 export const stageOrder: RevealStage[] = [
