@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from "node:crypto";
 import type { DBClient, Database } from "./db.js";
 import { GameError } from "./auth.js";
+import { zoneMarkets, chanceFor, generateForZone } from "./zone-market.js";
 import {
   generate,
   evaluate,
@@ -239,6 +240,16 @@ export async function state(c: DBClient, userId: string): Promise<State> {
   ).rows[0];
   if (!u) throw new GameError(401, "Войдите заново");
   const config = await configFor(c);
+  const zonePity = (
+    await c.query("SELECT tld,counter FROM zone_pity WHERE user_id=$1", [
+      userId,
+    ])
+  ).rows;
+  const activeEvents = (
+    await c.query(
+      "SELECT * FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC",
+    )
+  ).rows;
   const collection = (
     await c.query(
       "SELECT count(*)::integer AS count,COALESCE(sum(value),0) AS value FROM domains WHERE owner_id=$1 AND status='kept'",
@@ -302,13 +313,27 @@ export async function state(c: DBClient, userId: string): Promise<State> {
       spinPrice: config.spinPrice,
       dailyReward: config.dailyReward,
       pityGuarantee: config.pityGuarantee,
+      zones: [...zoneMarkets(config).values()].map((zone) => {
+        const pity = zonePity.find((p) => p.tld === zone.name)?.counter ?? 0;
+        return {
+          name: zone.name,
+          spinPrice: zone.spinPrice,
+          multiplier: zone.multiplier,
+          baseRareChance: zone.baseRareChance,
+          rareChance: chanceFor(
+            zone,
+            config,
+            pity,
+            activeEvents[0]?.tld === zone.name
+              ? Number(activeEvents[0].boost)
+              : 1,
+          ),
+          pity,
+        };
+      }),
     },
     quests: await questsFor(c, userId),
-    events: (
-      await c.query(
-        "SELECT * FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC",
-      )
-    ).rows as any,
+    events: activeEvents as any,
     scanner:
       ((
         await c.query(
@@ -366,6 +391,7 @@ async function recordDrop(
   drop: Drop,
   kind: string,
   cost: number,
+  pityZone?: string,
 ) {
   const id = await insertDomain(c, u.id, drop, "pending", kind);
   await c.query(
@@ -373,6 +399,11 @@ async function recordDrop(
     [randomUUID(), u.id, id, kind, cost, u.pity],
   );
   const rare = rarities.indexOf(drop.rarity) >= 2;
+  if (pityZone)
+    await c.query(
+      "UPDATE zone_pity SET counter=$3 WHERE user_id=$1 AND tld=$2",
+      [u.id, pityZone, rare ? 0 : u.pity + 1],
+    );
   await c.query(
     "UPDATE users SET pity=$2,spins=spins+$3,last_spin_at=now() WHERE id=$1",
     [u.id, rare ? 0 : u.pity + 1, kind === "spin" ? 1 : 0],
@@ -389,15 +420,29 @@ export async function spin(
   u: any,
   config: Config,
   reroll = false,
+  requestedTld?: string,
 ) {
   if (u.last_spin_at && Date.now() - new Date(u.last_spin_at).getTime() < 1000)
     throw new GameError(429, "Подождите секунду перед следующим вращением");
   const pending = (
     await c.query(
-      "SELECT id FROM domains WHERE owner_id=$1 AND status='pending'",
+      "SELECT id,tld FROM domains WHERE owner_id=$1 AND status='pending'",
       [u.id],
     )
   ).rows[0];
+  const selectedTld = reroll ? pending?.tld : requestedTld;
+  const market = selectedTld ? zoneMarkets(config).get(selectedTld) : undefined;
+  if (!market) throw new GameError(400, "Выберите доступную доменную зону");
+  await c.query(
+    "INSERT INTO zone_pity(user_id,tld,counter) VALUES($1,$2,0) ON CONFLICT DO NOTHING",
+    [u.id, selectedTld],
+  );
+  const pity = (
+    await c.query(
+      "SELECT counter FROM zone_pity WHERE user_id=$1 AND tld=$2 FOR UPDATE",
+      [u.id, selectedTld],
+    )
+  ).rows[0].counter;
   if (
     (
       await c.query(
@@ -432,7 +477,7 @@ export async function spin(
   } else {
     if (pending)
       throw new GameError(409, "Сначала оставьте или продайте выпавший домен");
-    cost = u.free_spin ? 0 : config.spinPrice;
+    cost = u.free_spin ? 0 : market.spinPrice;
     await credit(c, u.id, -cost, u.free_spin ? "first_free_spin" : "spin");
     await c.query("UPDATE users SET free_spin=false WHERE id=$1", [u.id]);
   }
@@ -441,13 +486,21 @@ export async function spin(
       "SELECT tld,boost FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1",
     )
   ).rows[0];
-  const drop = generate(
+  const drop = generateForZone(
     config,
-    u.pity,
+    selectedTld!,
+    pity,
     undefined,
-    event ? { tld: event.tld, boost: Number(event.boost) } : undefined,
+    event?.tld === selectedTld ? Number(event.boost) : 1,
   );
-  const id = await recordDrop(c, u, drop, reroll ? "reroll" : "spin", cost);
+  const id = await recordDrop(
+    c,
+    { ...u, pity },
+    drop,
+    reroll ? "reroll" : "spin",
+    cost,
+    selectedTld,
+  );
   return { domainId: id };
 }
 export async function domainAction(

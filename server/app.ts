@@ -353,7 +353,11 @@ export function createApp(db: Database) {
     });
   const empty = z.object({}).strict();
   const idBody = z.object({ id: z.uuid() }).strict();
-  mutation("/spin", empty, (c, u, config) => game.spin(c, u, config));
+  mutation(
+    "/spin",
+    z.object({ tld: z.string().regex(/^[a-z]{2,12}$/) }).strict(),
+    (c, u, config, b) => game.spin(c, u, config, false, b.tld),
+  );
   mutation("/reroll", empty, (c, u, config) => game.spin(c, u, config, true));
   mutation(
     "/domain",
@@ -507,7 +511,15 @@ export function createApp(db: Database) {
     res.status(404).json({ error: "Метод не найден" }),
   );
   if (production) {
-    app.use(express.static(resolve("dist"), { maxAge: "1h" }));
+    app.use(
+      express.static(resolve("dist"), {
+        maxAge: "1h",
+        setHeaders: (response, path) => {
+          if (path.endsWith("index.html"))
+            response.setHeader("Cache-Control", "no-cache");
+        },
+      }),
+    );
     app.get("/{*path}", (_req, res) =>
       res.sendFile(resolve("dist/index.html")),
     );

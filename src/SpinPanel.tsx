@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowRight,
   Check,
@@ -40,6 +40,26 @@ export function SpinPanel({
   });
   const p = state.profile,
     locked = busy || rolling;
+  const [chosen, setChosen] = useState(() => {
+    try {
+      return localStorage.getItem("domain-drop-zone") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const zones = state.config.zones;
+  const selected = zones.find((z) => z.name === (state.pending?.tld ?? chosen));
+  useEffect(() => {
+    if (state.pending) setChosen(state.pending.tld);
+  }, [state.pending?.id]);
+  function choose(name: string) {
+    setChosen(name);
+    try {
+      localStorage.setItem("domain-drop-zone", name);
+    } catch {
+      /* The server always validates the chosen zone. */
+    }
+  }
   function changeFast() {
     const next = !fast;
     setFast(next);
@@ -72,6 +92,83 @@ export function SpinPanel({
           </span>
         </button>
       </div>
+      <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
+        <label htmlFor="spin-zone">
+          ДОМЕННАЯ ЗОНА {state.pending ? `.${state.pending.tld}` : ""}{" "}
+          <span>{zones.length} зон</span>
+        </label>
+        <select
+          id="spin-zone"
+          value={selected?.name ?? ""}
+          disabled={locked || !!state.pending || !!state.scanner}
+          onChange={(e) => choose(e.target.value)}
+        >
+          <option value="" disabled>
+            Выбери зону перед SPIN
+          </option>
+          {[...zones]
+            .sort(
+              (a, b) =>
+                a.spinPrice - b.spinPrice || a.name.localeCompare(b.name),
+            )
+            .map((z) => (
+              <option key={z.name} value={z.name}>
+                .{z.name} · {number(z.spinPrice)} coins · Rare+{" "}
+                {new Intl.NumberFormat("ru-RU", {
+                  style: "percent",
+                  maximumFractionDigits: 1,
+                }).format(z.baseRareChance)}
+              </option>
+            ))}
+        </select>
+        <div className="zone-shortcuts">
+          {["ua", "ru", "xyz", "uk", "io", "ai", "com"].map((name) => {
+            const z = zones.find((z) => z.name === name);
+            return z ? (
+              <button
+                type="button"
+                className={selected?.name === name ? "active" : ""}
+                key={name}
+                disabled={locked || !!state.pending || !!state.scanner}
+                onClick={() => choose(name)}
+              >
+                .{name}
+                <small>{number(z.spinPrice)} ◈</small>
+              </button>
+            ) : null;
+          })}
+        </div>
+        {selected ? (
+          <div className="zone-summary">
+            <span>
+              Rare+{" "}
+              <b>
+                {new Intl.NumberFormat("ru-RU", {
+                  style: "percent",
+                  maximumFractionDigits: 1,
+                }).format(selected.rareChance)}
+              </b>
+            </span>
+            <span>
+              Цена доменов <b>×{selected.multiplier}</b>
+            </span>
+            <span>
+              SPIN <b>{number(selected.spinPrice)} ◈</b>
+            </span>
+          </div>
+        ) : (
+          <p className="zone-explanation">
+            Дешёвые зоны — чаще Rare+, но дешевле находки. Дорогие — ниже шанс,
+            выше стоимость доменов.
+          </p>
+        )}
+        {state.pending && (
+          <p className="zone-explanation">
+            Зону можно сменить после «Оставить» или «Продать». Re-roll остаётся
+            в .{state.pending.tld}.
+          </p>
+        )}
+      </div>
       <CardDecryption
         result={state.pending}
         previous={previous}
@@ -79,7 +176,9 @@ export function SpinPanel({
         waiting={busy && !rolling}
         fast={fast}
         sound={sound}
-        highValueThreshold={state.config.spinPrice * 20}
+        highValueThreshold={
+          (selected?.spinPrice ?? state.config.spinPrice) * 20
+        }
         onDone={onDone}
         onDetails={onDetails}
       />
@@ -128,14 +227,19 @@ export function SpinPanel({
             disabled={
               locked ||
               !!state.scanner ||
-              (!p.free_spin && p.coins < state.config.spinPrice)
+              !selected ||
+              (!p.free_spin && p.coins < selected.spinPrice)
             }
-            onClick={() => act("/spin", {}, true)}
+            onClick={() =>
+              selected && act("/spin", { tld: selected.name }, true)
+            }
           >
             <Zap size={20} />
             {p.free_spin
               ? "SPIN — FREE"
-              : `SPIN — ${number(state.config.spinPrice)}`}
+              : selected
+                ? `SPIN — ${number(selected.spinPrice)}`
+                : "SPIN"}
             <ArrowRight size={18} />
           </button>
           {state.scanner && (
@@ -148,7 +252,9 @@ export function SpinPanel({
               ? "Раскрываем сигнал. Тап по карточке — ускорить."
               : p.free_spin
                 ? "Первый Spin в подарок. Coins останутся на балансе."
-                : "Имя → зона → редкость. Что скрывает твой сигнал?"}
+                : selected
+                  ? `Расшифровка домена в зоне .${selected.name}`
+                  : "Сначала выбери доменную зону выше"}
           </small>
         </div>
       )}
@@ -156,18 +262,19 @@ export function SpinPanel({
         <span>
           <Sparkles size={15} /> LUCK{" "}
           <b>
-            {p.pity}/{state.config.pityGuarantee}
+            {selected?.pity ?? 0}/{state.config.pityGuarantee}
           </b>
         </span>
         <div className="progress">
           <i
             style={{
-              width: `${Math.min(100, (p.pity / state.config.pityGuarantee) * 100)}%`,
+              width: `${Math.min(100, ((selected?.pity ?? 0) / state.config.pityGuarantee) * 100)}%`,
             }}
           />
         </div>
         <small>
-          Rare+ не позднее {state.config.pityGuarantee}-го выпадения
+          Luck отдельно для каждой зоны · Rare+ до {state.config.pityGuarantee}
+          -го выпадения
         </small>
       </div>
     </section>

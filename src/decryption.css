@@ -639,3 +639,123 @@
     display: none;
   }
 }
+
+.zone-picker {
+  padding: 8px 24px 0;
+  max-width: 620px;
+  margin: auto;
+}
+.zone-picker > label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font:
+    500 9px "Space Grotesk",
+    monospace;
+  letter-spacing: 1.5px;
+  color: #a3b5ce;
+  margin: 4px 0 10px;
+}
+.zone-picker > label > span {
+  color: #5e769a;
+  font-size: 8px;
+  letter-spacing: 0;
+}
+.zone-picker > select {
+  width: 100%;
+  background: #111e31;
+  border-color: #344e75;
+  color: #d6e6ff;
+  font-size: 12px;
+  min-height: 46px;
+}
+.zone-picker.is-locked > select,
+.zone-picker.is-locked > .zone-shortcuts {
+  display: none;
+}
+.zone-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+}
+.zone-shortcuts > button {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  background: #141e2e;
+  border: 1px solid #283b57;
+  border-radius: 7px;
+  padding: 9px 4px;
+  color: #8ea4c3;
+  font:
+    600 13px "Space Grotesk",
+    monospace;
+  min-height: 48px;
+}
+.zone-shortcuts > button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.09);
+}
+.zone-shortcuts small {
+  font-size: 8px;
+  font-weight: 400;
+  color: #7c8fae;
+}
+.zone-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: #748cad;
+  margin: 12px 0 0;
+}
+.zone-summary b {
+  color: #b1c6e5;
+  margin-left: 4px;
+  font-family: "Space Grotesk", monospace;
+}
+.zone-explanation {
+  font-size: 11px;
+  color: #8296b3;
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+.zone-picker + .decryption-stage {
+  padding-top: 20px;
+}
+.zone-shortcuts > button:disabled {
+  opacity: 0.7;
+}
+@media (max-width: 520px) {
+  .zone-picker {
+    padding: 6px 16px 0;
+  }
+  .zone-picker > select {
+    font-size: 12px;
+  }
+  .zone-shortcuts {
+    gap: 4px;
+  }
+  .zone-shortcuts > button {
+    font-size: 12px;
+    min-height: 46px;
+  }
+  .zone-shortcuts small {
+    font-size: 9px;
+  }
+  .zone-summary {
+    font-size: 9px;
+    gap: 5px;
+  }
+  .zone-summary b {
+    margin-left: 2px;
+  }
+  .zone-explanation {
+    font-size: 10px;
+  }
+  .zone-picker + .decryption-stage {
+    padding-top: 17px;
+  }
+}

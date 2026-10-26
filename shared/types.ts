@@ -85,7 +85,19 @@ export type Event = {
 export type State = {
   profile: Profile;
   pending: Domain | null;
-  config: { spinPrice: number; dailyReward: number; pityGuarantee: number };
+  config: {
+    spinPrice: number;
+    dailyReward: number;
+    pityGuarantee: number;
+    zones: {
+      name: string;
+      spinPrice: number;
+      multiplier: number;
+      baseRareChance: number;
+      rareChance: number;
+      pity: number;
+    }[];
+  };
   quests: Quest[];
   events: Event[];
   scanner: { id: string } | null;
