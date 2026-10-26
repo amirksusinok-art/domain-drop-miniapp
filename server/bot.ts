@@ -37,7 +37,9 @@ export async function configureBot(
         await new Promise((resolve) => setTimeout(resolve, wait * 1000));
         continue;
       }
-      throw new Error(`Telegram ${method} rejected`);
+      throw new Error(
+        `Telegram ${method} rejected (${Number(result.error_code) || "unknown status"})`,
+      );
     }
   }
   const bot = await call("getMe");
@@ -45,7 +47,9 @@ export async function configureBot(
     bot.username?.toLowerCase() !==
     config.username.replace(/^@/, "").toLowerCase()
   )
-    throw new Error("Telegram bot identity mismatch");
+    throw new Error(
+      `Telegram bot identity mismatch: received @${bot.username ?? "unknown"}`,
+    );
   await call("setChatMenuButton", {
     menu_button: {
       type: "web_app",
@@ -89,10 +93,12 @@ export function startBotSetup() {
       status = "ready";
       console.log("Telegram bot menu and webhook verified");
     })
-    .catch(() => {
+    .catch((error: unknown) => {
       status = "failed";
+      // configureBot emits only sanitized method names, never request URLs.
       console.error(
-        "Telegram setup failed; check server configuration and Telegram availability",
+        "Telegram setup failed:",
+        error instanceof Error ? error.message : "unknown error",
       );
     });
 }
