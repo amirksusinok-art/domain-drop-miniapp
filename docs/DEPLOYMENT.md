@@ -2,15 +2,15 @@
 
 ## Render
 
-`render.yaml` описывает один Node web service и PostgreSQL 17 в Frankfurt. API и frontend используют один origin. Сборка: `npm ci --include=dev && npm run build`; запуск: `npm start`. Health check: `/api/health`. Миграции выполняются перед открытием HTTP-порта под PostgreSQL advisory lock.
+`render.yaml` описывает Node web service в Frankfurt. PostgreSQL подключается через серверный секрет DATABASE_URL. Для согласованного тестового стенда используется существующая anything-fishing-db в том же аккаунте и регионе, с отдельной схемой `domain_drop_miniapp`. Таблицы, данные и настройки другого приложения не изменяются. API и frontend используют один origin. Сборка: `npm ci --include=dev && npm run build`; запуск: `npm start`. Health check: `/api/health`. Миграции выполняются перед открытием HTTP-порта под PostgreSQL advisory lock.
 
 Blueprint использует бесплатные ресурсы **для тестового стенда**. Free web service засыпает; Free PostgreSQL имеет срок жизни 30 дней. Для реального запуска перейти на оплачиваемый web service и PostgreSQL с резервными копиями. Аукционы закрываются ближайшим scheduler pass (до 30 секунд при работающем процессе); после сна закрываются при запуске. Free-тариф не подходит для точного времени аукционов.
 
 1. Создать Blueprint из этого репозитория в подтверждённом Render workspace.
-2. Убедиться, что `DATABASE_URL` ссылается на внутреннее соединение `domain-drop-db` в том же регионе. Внешние подключения к БД закрыты.
+2. Задать внутреннее соединение PostgreSQL в `DATABASE_URL` и `DATABASE_SCHEMA=domain_drop_miniapp`. Backend создаёт только собственную схему и выполняет все игровые запросы внутри неё. Разделение по схемам предотвращает конфликт имён таблиц, но не заменяет отдельную базу/роль для строгой изоляции доступа. Для отдельного production PostgreSQL можно использовать `DATABASE_SCHEMA=public`.
 3. Проверить реальный URL сервиса. Если Render добавил суффикс, изменить `APP_URL` на выданный HTTPS URL.
 4. В Environment сервиса добавить `BOT_TOKEN`, `BOT_USERNAME`, `ADMIN_TELEGRAM_IDS` (ID владельца через запятую) и при необходимости `SUPPORT_USERNAME`. `WEBHOOK_SECRET` Blueprint генерирует автоматически.
-5. Сохранить с перезапуском. _*Не добавлять секреты в GitHub, frontend или VITE_* переменные._*
+5. Сохранить с перезапуском. _\*Не добавлять секреты в GitHub, frontend или VITE_* переменные._*
 6. Проверить `/api/health`, `/api/bootstrap` (`devAuth:false`) и отсутствие доступа к `/api/auth/dev`.
 
 Сервис может безопасно стартовать до добавления BOT_TOKEN: API игры остаётся за авторизацией, mock-вход закрыт. Это состояние подготовки, а не завершённое подключение Telegram.

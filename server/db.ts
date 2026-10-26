@@ -18,12 +18,18 @@ export async function database(
   memory = false,
 ): Promise<Database> {
   if (url) {
+    const schema = process.env.DATABASE_SCHEMA || "public";
+    if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema))
+      throw new Error("Invalid DATABASE_SCHEMA");
     const pool = new pg.Pool({
       connectionString: url,
+      options: `-c search_path=${schema}`,
       max: 10,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
     });
+    if (schema !== "public")
+      await pool.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
     const wrap = (client: pg.Pool | pg.PoolClient): DBClient => ({
       embedded: false,
       query: async (sql, params) => {

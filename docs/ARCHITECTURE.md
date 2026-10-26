@@ -18,7 +18,7 @@ Telegram WebView → React / Vite → Express TypeScript API → PostgreSQL.
 ## Layout
 
 `server/`: auth, database adapter, migrations, economy, game services, API, scheduler.
-`src/`: mobile-first React screens, wheel animation and Telegram bridge.
+`src/`: mobile-first React screens, Card Decryption animation and Telegram bridge.
 `shared/`: response types; no economy configuration or secrets in browser code.
 `tests/`: authentication, immutable snapshots, transactional gameplay and concurrency regression tests.
 

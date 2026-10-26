@@ -18,16 +18,10 @@ services:
       - key: APP_URL
         value: https://domain-drop-miniapp.onrender.com
       - key: DATABASE_URL
-        fromDatabase:
-          name: domain-drop-db
-          property: connectionString
+        sync: false
+      - key: DATABASE_SCHEMA
+        value: domain_drop_miniapp
       - key: WEBHOOK_SECRET
         generateValue: true
 # BOT_TOKEN, BOT_USERNAME, ADMIN_TELEGRAM_IDS and SUPPORT_USERNAME are added
 # as server-only secrets/settings after the initial deploy, via Dashboard.
-databases:
-  - name: domain-drop-db
-    region: frankfurt
-    plan: free
-    postgresMajorVersion: "17"
-    ipAllowList: []

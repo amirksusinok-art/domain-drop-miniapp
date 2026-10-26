@@ -9,7 +9,7 @@ import {
   revealTimeline,
   type RevealFrame,
 } from "./decryption";
-import './decryption.css';
+import "./decryption.css";
 
 const idle: RevealFrame = {
   at: 0,
@@ -115,6 +115,9 @@ export function CardDecryption({
               before.tldLocked < next.tldLocked,
           );
         }
+        // Preserve each reveal layer for at least one rendered frame, even
+        // when a tap or a backgrounded WebView advances the clock far ahead.
+        if (next.stage !== before.stage) break;
       }
       setFrame((current) => (current === next ? current : next));
       if (next.stage === "ready") {
