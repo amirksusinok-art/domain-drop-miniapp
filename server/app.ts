@@ -18,6 +18,7 @@ import {
   evaluate,
 } from "./economy.js";
 import * as game from "./game.js";
+import { botSetupStatus } from "./bot.js";
 export function createApp(db: Database) {
   const app = express();
   const production = process.env.NODE_ENV === "production";
@@ -68,6 +69,7 @@ export function createApp(db: Database) {
     res.json({
       devAuth: !production && process.env.DEV_AUTH === "true",
       botUsername: process.env.BOT_USERNAME ?? "",
+      telegramSetup: botSetupStatus(),
     }),
   );
   app.post("/api/auth/telegram", authLimit, async (req, res) => {

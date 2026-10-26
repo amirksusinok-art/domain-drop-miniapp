@@ -3,6 +3,7 @@ import { database } from "./db.js";
 import { migrate } from "./migrate.js";
 import { createApp } from "./app.js";
 import { scheduler } from "./game.js";
+import { startBotSetup } from "./bot.js";
 const db = await database();
 await migrate(db);
 await scheduler(db);
@@ -13,6 +14,7 @@ const server = app.listen(port, "0.0.0.0", () =>
     `DOMAIN DROP listening on port ${port} (${db.embedded ? "local PostgreSQL" : "PostgreSQL"})`,
   ),
 );
+startBotSetup();
 let ticking = false;
 const timer = setInterval(async () => {
   if (ticking) return;
