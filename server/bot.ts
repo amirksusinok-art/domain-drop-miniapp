@@ -14,6 +14,7 @@ export async function configureBot(
   async function call(method: string, body: unknown = {}) {
     for (let attempt = 0; attempt < 3; attempt++) {
       let result: any;
+      let responseStatus: number | undefined;
       try {
         const response = await request(
           `https://api.telegram.org/bot${config.token}/${method}`,
@@ -24,9 +25,19 @@ export async function configureBot(
             signal: AbortSignal.timeout(15000),
           },
         );
+        responseStatus = response.status;
         result = await response.json();
-      } catch {
-        throw new Error(`Telegram ${method} unavailable`);
+      } catch (error: unknown) {
+        const diagnostic = error as {
+          name?: string;
+          cause?: { code?: string };
+        };
+        const kind = (diagnostic.cause?.code ?? diagnostic.name ?? "network")
+          .replace(/[^a-zA-Z0-9_]/g, "")
+          .slice(0, 40);
+        throw new Error(
+          `Telegram ${method} unavailable (${responseStatus ?? kind})`,
+        );
       }
       if (result.ok) return result.result;
       if (result.error_code === 429 && attempt < 2) {
