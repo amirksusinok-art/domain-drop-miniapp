@@ -1,5 +1,10 @@
 import { defaultConfig } from "../server/economy.js";
-import { zoneMarkets, generateForZone } from "../server/zone-market.js";
+import {
+  zoneMarkets,
+  generateForZone,
+  randomMarket,
+  generateRandom,
+} from "../server/zone-market.js";
 import { rarities } from "../shared/types.js";
 let seed = 437122;
 const rng = () => {
@@ -8,16 +13,27 @@ const rng = () => {
 };
 const n = Number(process.argv[2] ?? 100000),
   only = process.argv.slice(3),
-  markets = zoneMarkets(defaultConfig);
+  markets = zoneMarkets(defaultConfig),
+  preparedRandom = randomMarket(defaultConfig);
 const report = [];
-for (const zone of markets.values()) {
+for (const zone of [...markets.values(), randomMarket(defaultConfig)]) {
   if (only.length && !only.includes(zone.name)) continue;
   let pity = 0,
     total = 0,
     maxPity = 0,
     rare = 0;
   for (let i = 0; i < n; i++) {
-    const d = generateForZone(defaultConfig, zone.name, pity, rng, 1, zone);
+    const d =
+      zone.name === "random"
+        ? generateRandom(defaultConfig, pity, rng, undefined, preparedRandom)
+        : generateForZone(
+            defaultConfig,
+            zone.name,
+            pity,
+            rng,
+            1,
+            zone as import("../server/zone-market.js").ZoneMarket,
+          );
     total += d.value;
     const good = rarities.indexOf(d.rarity) >= 2;
     if (good) rare++;

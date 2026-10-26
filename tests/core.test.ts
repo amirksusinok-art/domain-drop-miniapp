@@ -341,3 +341,40 @@ test("Pity cannot be transferred from cheap zones to premium zones", async () =>
     29,
   );
 });
+test("RANDOM mode, its price and reroll behavior survive persisted results", async () => {
+  const u = await user(112);
+  const first = await request(u.token, "/spin", { tld: "random" });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.state.pending.spin_mode, "random");
+  assert.notEqual(first.body.state.pending.tld, "random");
+  const restored = (await request(u.token, "/state")).body;
+  assert.equal(restored.pending.spin_mode, "random");
+  await request(u.token, "/domain", {
+    id: restored.pending.id,
+    action: "keep",
+  });
+  await ready(u.userId);
+  const paid = await request(u.token, "/spin", { tld: "random" });
+  assert.equal(paid.status, 200);
+  assert.equal(paid.body.state.profile.coins, 9500);
+  assert.equal(paid.body.state.pending.spin_mode, "random");
+  await assert.rejects(
+    db.query("UPDATE domains SET spin_mode='com' WHERE id=$1", [
+      paid.body.state.pending.id,
+    ]),
+  );
+  await ready(u.userId);
+  const rerolled = await request(u.token, "/reroll", {});
+  assert.equal(rerolled.status, 200);
+  assert.equal(rerolled.body.state.pending.spin_mode, "random");
+  assert.equal(rerolled.body.state.profile.coins, 9500);
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::integer AS n FROM zone_pity WHERE user_id=$1 AND tld<>$2",
+        [u.userId, "random"],
+      )
+    ).rows[0].n,
+    0,
+  );
+});

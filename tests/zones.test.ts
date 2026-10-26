@@ -5,6 +5,9 @@ import {
   zoneMarkets,
   generateForZone,
   chanceFor,
+  randomMarket,
+  generateRandom,
+  randomChance,
 } from "../server/zone-market.js";
 import { rarities } from "../shared/types.js";
 test("Expanded catalog contains 81 unique zones and hundreds of different names", () => {
@@ -75,4 +78,29 @@ test("Selected-zone economy targets 85% RTP including its own pity sequence", ()
     const rtp = total / n / zone.spinPrice;
     assert.ok(rtp > 0.79 && rtp < 0.91, `${tld}: ${rtp}`);
   }
+});
+test("RANDOM chooses real zones on the server and has its own calibrated payout", () => {
+  let seed = 437122;
+  const rng = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const mode = randomMarket(defaultConfig),
+    found = new Set<string>();
+  let pity = 0,
+    total = 0;
+  const n = 150000;
+  assert.equal(mode.spinPrice, 500);
+  assert.ok(Math.abs(randomChance(defaultConfig, 29) - 1) < 1e-10);
+  for (let i = 0; i < n; i++) {
+    const drop = generateRandom(defaultConfig, pity, rng, undefined, mode);
+    assert.notEqual(drop.tld, "random");
+    found.add(drop.tld);
+    total += drop.value;
+    pity = rarities.indexOf(drop.rarity) >= 2 ? 0 : pity + 1;
+  }
+  assert.equal(found.size, 81);
+  assert.ok(
+    total / n / mode.spinPrice > 0.79 && total / n / mode.spinPrice < 0.91,
+  );
 });

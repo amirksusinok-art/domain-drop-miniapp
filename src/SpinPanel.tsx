@@ -1,21 +1,16 @@
-import { useState, useEffect } from "react";
-import {
-  ArrowRight,
-  Check,
-  Disc3,
-  RefreshCw,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Check, RefreshCw, Zap } from "lucide-react";
 import type { Domain, State } from "../shared/types";
 import { CardDecryption } from "./CardDecryption";
 import { number } from "./components";
+import "./minimal-spin.css";
 export function SpinPanel({
   state,
   previous,
   rolling,
   busy,
   sound,
+  fast,
   onDone,
   act,
   onDetails,
@@ -26,76 +21,53 @@ export function SpinPanel({
   rolling: boolean;
   busy: boolean;
   sound: boolean;
+  fast: boolean;
   onDone: () => void;
   act: (path: string, body?: unknown, animate?: boolean) => Promise<unknown>;
   onDetails: () => void;
   onScanner: () => void;
 }) {
-  const [fast, setFast] = useState(() => {
+  const [chosen, setChosen] = useState(() => {
     try {
-      return localStorage.getItem("domain-drop-fast-spin") === "true";
+      return localStorage.getItem("domain-drop-zone") || "random";
     } catch {
-      return false;
+      return "random";
     }
   });
   const p = state.profile,
-    locked = busy || rolling;
-  const [chosen, setChosen] = useState(() => {
-    try {
-      return localStorage.getItem("domain-drop-zone") ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const zones = state.config.zones;
-  const selected = zones.find((z) => z.name === (state.pending?.tld ?? chosen));
+    locked = busy || rolling,
+    zones = state.config.zones;
+  const pendingMode = state.pending?.spin_mode ?? state.pending?.tld;
+  const selected =
+    zones.find((z) => z.name === (pendingMode ?? chosen)) ??
+    zones.find((z) => z.name === "random");
   useEffect(() => {
-    if (state.pending) setChosen(state.pending.tld);
-  }, [state.pending?.id]);
+    if (pendingMode) setChosen(pendingMode);
+  }, [pendingMode]);
   function choose(name: string) {
     setChosen(name);
     try {
       localStorage.setItem("domain-drop-zone", name);
     } catch {
-      /* The server always validates the chosen zone. */
-    }
-  }
-  function changeFast() {
-    const next = !fast;
-    setFast(next);
-    try {
-      localStorage.setItem("domain-drop-fast-spin", String(next));
-    } catch {
-      /* Cosmetic preference can remain in memory. */
+      /* Selection is validated by the server. */
     }
   }
   return (
     <section
       className={
-        "generator decryption-generator " + (rolling ? "is-opening" : "")
+        "generator decryption-generator minimal-spin " +
+        (rolling ? "is-opening" : "")
       }
+      aria-label="Генератор доменов"
     >
-      <div className="generator-top">
-        <span>
-          <Disc3 size={16} /> CARD DECRYPTION
-        </span>
-        <button
-          type="button"
-          className={"fast-spin " + (fast ? "enabled" : "")}
-          aria-pressed={fast}
-          disabled={locked}
-          onClick={changeFast}
-        >
-          <Zap size={13} /> FAST SPIN{" "}
-          <span className="toggle-track">
-            <i />
-          </span>
-        </button>
-      </div>
       <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
         <label htmlFor="spin-zone">
-          ДОМЕННАЯ ЗОНА {state.pending ? `.${state.pending.tld}` : ""}{" "}
-          <span>{zones.length} зон</span>
+          ЗОНА{" "}
+          {state.pending
+            ? pendingMode === "random"
+              ? "RANDOM"
+              : "." + state.pending.tld
+            : ""}
         </label>
         <select
           id="spin-zone"
@@ -104,70 +76,42 @@ export function SpinPanel({
           onChange={(e) => choose(e.target.value)}
         >
           <option value="" disabled>
-            Выбери зону перед SPIN
+            Выбери зону
           </option>
           {[...zones]
-            .sort(
-              (a, b) =>
-                a.spinPrice - b.spinPrice || a.name.localeCompare(b.name),
+            .sort((a, b) =>
+              a.name === "random"
+                ? -1
+                : b.name === "random"
+                  ? 1
+                  : a.spinPrice - b.spinPrice || a.name.localeCompare(b.name),
             )
             .map((z) => (
               <option key={z.name} value={z.name}>
-                .{z.name} · {number(z.spinPrice)} coins · Rare+{" "}
-                {new Intl.NumberFormat("ru-RU", {
-                  style: "percent",
-                  maximumFractionDigits: 1,
-                }).format(z.baseRareChance)}
+                {z.name === "random" ? "RANDOM" : "." + z.name} ·{" "}
+                {number(z.spinPrice)} coins
               </option>
             ))}
         </select>
         <div className="zone-shortcuts">
-          {["ua", "ru", "xyz", "uk", "io", "ai", "com"].map((name) => {
-            const z = zones.find((z) => z.name === name);
-            return z ? (
-              <button
-                type="button"
-                className={selected?.name === name ? "active" : ""}
-                key={name}
-                disabled={locked || !!state.pending || !!state.scanner}
-                onClick={() => choose(name)}
-              >
-                .{name}
-                <small>{number(z.spinPrice)} ◈</small>
-              </button>
-            ) : null;
-          })}
+          {["random", "ua", "ru", "xyz", "uk", "io", "ai", "com"].map(
+            (name) => {
+              const z = zones.find((z) => z.name === name);
+              return z ? (
+                <button
+                  type="button"
+                  className={selected?.name === name ? "active" : ""}
+                  key={name}
+                  disabled={locked || !!state.pending || !!state.scanner}
+                  onClick={() => choose(name)}
+                >
+                  {name === "random" ? "RANDOM" : "." + name}
+                  <small>{number(z.spinPrice)} ◈</small>
+                </button>
+              ) : null;
+            },
+          )}
         </div>
-        {selected ? (
-          <div className="zone-summary">
-            <span>
-              Rare+{" "}
-              <b>
-                {new Intl.NumberFormat("ru-RU", {
-                  style: "percent",
-                  maximumFractionDigits: 1,
-                }).format(selected.rareChance)}
-              </b>
-            </span>
-            <span>
-              Цена доменов <b>×{selected.multiplier}</b>
-            </span>
-            <span>
-              SPIN <b>{number(selected.spinPrice)} ◈</b>
-            </span>
-          </div>
-        ) : (
-          <p className="zone-explanation">
-            Дешёвые зоны — чаще Rare+, но дешевле находки. Дорогие — ниже шанс,
-            выше стоимость доменов.
-          </p>
-        )}
-        {state.pending && (
-          <p className="zone-explanation">
-            Зону можно сменить после «Оставить» или «Продать». Re-roll остаётся
-            в .{state.pending.tld}.
-          </p>
-        )}
       </div>
       <CardDecryption
         result={state.pending}
@@ -213,12 +157,9 @@ export function SpinPanel({
             {p.reroll_available
               ? "FREE RE-ROLL 1/1"
               : p.reroll_tokens
-                ? `RE-ROLL TOKEN · ${p.reroll_tokens}`
+                ? "RE-ROLL TOKEN · " + p.reroll_tokens
                 : "FREE RE-ROLL 0/1"}
           </button>
-          <small className="muted">
-            При Re-roll текущий домен исчезнет навсегда
-          </small>
         </div>
       ) : (
         <div className="spin-controls decrypt-controls">
@@ -238,45 +179,17 @@ export function SpinPanel({
             {p.free_spin
               ? "SPIN — FREE"
               : selected
-                ? `SPIN — ${number(selected.spinPrice)}`
+                ? "SPIN — " + number(selected.spinPrice)
                 : "SPIN"}
             <ArrowRight size={18} />
           </button>
           {state.scanner && (
             <button className="text-button" onClick={onScanner}>
-              Завершить открытый Scanner →
+              Завершить открытый Scanner
             </button>
           )}
-          <small>
-            {rolling
-              ? "Раскрываем сигнал. Тап по карточке — ускорить."
-              : p.free_spin
-                ? "Первый Spin в подарок. Coins останутся на балансе."
-                : selected
-                  ? `Расшифровка домена в зоне .${selected.name}`
-                  : "Сначала выбери доменную зону выше"}
-          </small>
         </div>
       )}
-      <div className="luck">
-        <span>
-          <Sparkles size={15} /> LUCK{" "}
-          <b>
-            {selected?.pity ?? 0}/{state.config.pityGuarantee}
-          </b>
-        </span>
-        <div className="progress">
-          <i
-            style={{
-              width: `${Math.min(100, ((selected?.pity ?? 0) / state.config.pityGuarantee) * 100)}%`,
-            }}
-          />
-        </div>
-        <small>
-          Luck отдельно для каждой зоны · Rare+ до {state.config.pityGuarantee}
-          -го выпадения
-        </small>
-      </div>
     </section>
   );
 }

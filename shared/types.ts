@@ -23,6 +23,7 @@ export type Domain = {
     scale: number;
   };
   status: "pending" | "kept" | "sold" | "destroyed";
+  spin_mode?: string | null;
   favorite: boolean;
   vaulted: boolean;
   showcase: boolean;
@@ -92,7 +93,7 @@ export type State = {
     zones: {
       name: string;
       spinPrice: number;
-      multiplier: number;
+      multiplier: number | null;
       baseRareChance: number;
       rareChance: number;
       pity: number;

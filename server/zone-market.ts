@@ -17,6 +17,144 @@ export type ZoneMarket = {
   high: number[];
 };
 const cache = new Map<string, Map<string, ZoneMarket>>();
+export type RandomMarket = {
+  name: "random";
+  spinPrice: number;
+  multiplier: null;
+  baseRareChance: number;
+  scale: number;
+  entries: { zone: ZoneMarket; weight: number }[];
+};
+const randomCache = new Map<string, RandomMarket>();
+export function randomMarket(config: Config): RandomMarket {
+  const key = JSON.stringify(config),
+    cached = randomCache.get(key);
+  if (cached) return cached;
+  const markets = zoneMarkets(config),
+    total = config.tlds.reduce((sum, t) => sum + t.weight, 0);
+  const entries = config.tlds.map((t) => ({
+    zone: markets.get(t.name)!,
+    weight: t.weight / total,
+  }));
+  let survival = 1,
+    visits = 0,
+    values = 0;
+  const means = entries.map(({ zone, weight }) => ({
+    zone,
+    weight,
+    low: zone.low.reduce(
+      (sum, p, i) =>
+        sum +
+        p *
+          (zone.buckets[i].reduce((s, d) => s + d.value, 0) /
+            (zone.buckets[i].length || 1)),
+      0,
+    ),
+    high: zone.high.reduce(
+      (sum, p, i) =>
+        sum +
+        p *
+          (zone.buckets[i].reduce((s, d) => s + d.value, 0) /
+            (zone.buckets[i].length || 1)),
+      0,
+    ),
+  }));
+  for (let pity = 0; pity < config.pityGuarantee; pity++) {
+    let good = 0,
+      mean = 0;
+    for (const entry of means) {
+      const p = chanceFor(entry.zone, config, pity);
+      good += entry.weight * p;
+      mean += entry.weight * ((1 - p) * entry.low + p * entry.high);
+    }
+    visits += survival;
+    values += survival * mean;
+    survival *= 1 - good;
+  }
+  const market: RandomMarket = {
+    name: "random",
+    spinPrice: config.spinPrice,
+    multiplier: null,
+    baseRareChance: entries.reduce(
+      (sum, e) => sum + e.weight * e.zone.baseRareChance,
+      0,
+    ),
+    scale:
+      (config.spinPrice *
+        0.85 *
+        (config.valueScale / defaultConfig.valueScale)) /
+      (values / visits),
+    entries,
+  };
+  randomCache.set(key, market);
+  if (randomCache.size > 4)
+    randomCache.delete(randomCache.keys().next().value!);
+  return market;
+}
+export function randomChance(
+  config: Config,
+  pity: number,
+  event?: { tld: string; boost: number },
+) {
+  const entries = randomMarket(config).entries,
+    total = entries.reduce(
+      (sum, e) =>
+        sum + e.weight * (event?.tld === e.zone.name ? event.boost : 1),
+      0,
+    );
+  return entries.reduce(
+    (sum, e) =>
+      sum +
+      ((e.weight * (event?.tld === e.zone.name ? event.boost : 1)) / total) *
+        chanceFor(
+          e.zone,
+          config,
+          pity,
+          event?.tld === e.zone.name ? event.boost : 1,
+        ),
+    0,
+  );
+}
+export function generateRandom(
+  config: Config,
+  pity: number,
+  rng = random,
+  event?: { tld: string; boost: number },
+  prepared?: RandomMarket,
+): Drop {
+  const market = prepared ?? randomMarket(config);
+  const total = market.entries.reduce(
+    (sum, e) => sum + e.weight * (event?.tld === e.zone.name ? event.boost : 1),
+    0,
+  );
+  let draw = rng() * total;
+  let selected = market.entries.at(-1)!;
+  for (const entry of market.entries) {
+    draw -= entry.weight * (event?.tld === entry.zone.name ? event.boost : 1);
+    if (draw < 0) {
+      selected = entry;
+      break;
+    }
+  }
+  const drop = generateForZone(
+    config,
+    selected.zone.name,
+    pity,
+    rng,
+    event?.tld === selected.zone.name ? event.boost : 1,
+    selected.zone,
+  );
+  const scale = drop.breakdown.scale * market.scale,
+    b = drop.breakdown;
+  return {
+    ...drop,
+    value: Math.max(
+      1,
+      Math.round(b.base * b.tldMultiplier * b.rarityBonus * b.special * scale),
+    ),
+    breakdown: { ...b, scale },
+  };
+}
 export function expandTlds(config: Config): Config {
   return {
     ...config,

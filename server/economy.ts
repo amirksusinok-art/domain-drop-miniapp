@@ -2,7 +2,10 @@ import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { rarities, type Rarity } from "../shared/types.js";
 const tldSchema = z.object({
-  name: z.string().regex(/^[a-z]{2,12}$/),
+  name: z
+    .string()
+    .regex(/^[a-z]{2,12}$/)
+    .refine((name) => name !== "random", "RANDOM is a spin mode, not a TLD"),
   weight: z.number().min(0.01).max(1000),
   multiplier: z.number().min(0.1).max(10),
   score: z.number().int().min(0).max(30),

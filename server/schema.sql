@@ -20,10 +20,11 @@ CREATE TABLE IF NOT EXISTS domains (
  created_at timestamptz NOT NULL DEFAULT now(), CHECK(NOT vaulted OR status='kept'), CHECK(NOT showcase OR status='kept')
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_pending_drop ON domains(owner_id) WHERE status='pending';
+ALTER TABLE domains ADD COLUMN IF NOT EXISTS spin_mode text;
 CREATE INDEX IF NOT EXISTS collection_lookup ON domains(owner_id,status,created_at DESC);
 CREATE OR REPLACE FUNCTION immutable_domain() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- IF ROW(NEW.name,NEW.tld,NEW.rarity,NEW.score,NEW.value,NEW.tags,NEW.breakdown) IS DISTINCT FROM ROW(OLD.name,OLD.tld,OLD.rarity,OLD.score,OLD.value,OLD.tags,OLD.breakdown) THEN
+ IF ROW(NEW.name,NEW.tld,NEW.rarity,NEW.score,NEW.value,NEW.tags,NEW.breakdown,NEW.spin_mode) IS DISTINCT FROM ROW(OLD.name,OLD.tld,OLD.rarity,OLD.score,OLD.value,OLD.tags,OLD.breakdown,OLD.spin_mode) THEN
    RAISE EXCEPTION 'Domain attributes are immutable';
  END IF;
  RETURN NEW;

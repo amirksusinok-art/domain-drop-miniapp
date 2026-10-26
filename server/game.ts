@@ -1,7 +1,14 @@
 import { randomUUID, createHash } from "node:crypto";
 import type { DBClient, Database } from "./db.js";
 import { GameError } from "./auth.js";
-import { zoneMarkets, chanceFor, generateForZone } from "./zone-market.js";
+import {
+  zoneMarkets,
+  chanceFor,
+  generateForZone,
+  randomMarket,
+  randomChance,
+  generateRandom,
+} from "./zone-market.js";
 import {
   generate,
   evaluate,
@@ -185,10 +192,11 @@ export async function insertDomain(
   drop: Drop,
   status = "pending",
   source = "spin",
+  spinMode?: string,
 ) {
   const id = randomUUID();
   await c.query(
-    "INSERT INTO domains(id,owner_id,name,tld,rarity,score,value,tags,breakdown,status,source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+    "INSERT INTO domains(id,owner_id,name,tld,rarity,score,value,tags,breakdown,status,source,spin_mode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
     [
       id,
       userId,
@@ -201,6 +209,7 @@ export async function insertDomain(
       JSON.stringify(drop.breakdown),
       status,
       source,
+      spinMode ?? null,
     ],
   );
   return id;
@@ -313,24 +322,43 @@ export async function state(c: DBClient, userId: string): Promise<State> {
       spinPrice: config.spinPrice,
       dailyReward: config.dailyReward,
       pityGuarantee: config.pityGuarantee,
-      zones: [...zoneMarkets(config).values()].map((zone) => {
-        const pity = zonePity.find((p) => p.tld === zone.name)?.counter ?? 0;
-        return {
-          name: zone.name,
-          spinPrice: zone.spinPrice,
-          multiplier: zone.multiplier,
-          baseRareChance: zone.baseRareChance,
-          rareChance: chanceFor(
-            zone,
-            config,
+      zones: [
+        ...[...zoneMarkets(config).values()].map((zone) => {
+          const pity = zonePity.find((p) => p.tld === zone.name)?.counter ?? 0;
+          return {
+            name: zone.name,
+            spinPrice: zone.spinPrice,
+            multiplier: zone.multiplier,
+            baseRareChance: zone.baseRareChance,
+            rareChance: chanceFor(
+              zone,
+              config,
+              pity,
+              activeEvents[0]?.tld === zone.name
+                ? Number(activeEvents[0].boost)
+                : 1,
+            ),
             pity,
-            activeEvents[0]?.tld === zone.name
-              ? Number(activeEvents[0].boost)
-              : 1,
+          };
+        }),
+        {
+          name: "random",
+          spinPrice: randomMarket(config).spinPrice,
+          multiplier: null,
+          baseRareChance: randomMarket(config).baseRareChance,
+          rareChance: randomChance(
+            config,
+            zonePity.find((p) => p.tld === "random")?.counter ?? 0,
+            activeEvents[0]
+              ? {
+                  tld: activeEvents[0].tld,
+                  boost: Number(activeEvents[0].boost),
+                }
+              : undefined,
           ),
-          pity,
-        };
-      }),
+          pity: zonePity.find((p) => p.tld === "random")?.counter ?? 0,
+        },
+      ],
     },
     quests: await questsFor(c, userId),
     events: activeEvents as any,
@@ -393,7 +421,7 @@ async function recordDrop(
   cost: number,
   pityZone?: string,
 ) {
-  const id = await insertDomain(c, u.id, drop, "pending", kind);
+  const id = await insertDomain(c, u.id, drop, "pending", kind, pityZone);
   await c.query(
     "INSERT INTO spins(id,user_id,domain_id,kind,cost,pity_before) VALUES($1,$2,$3,$4,$5,$6)",
     [randomUUID(), u.id, id, kind, cost, u.pity],
@@ -426,12 +454,19 @@ export async function spin(
     throw new GameError(429, "Подождите секунду перед следующим вращением");
   const pending = (
     await c.query(
-      "SELECT id,tld FROM domains WHERE owner_id=$1 AND status='pending'",
+      "SELECT id,tld,spin_mode FROM domains WHERE owner_id=$1 AND status='pending'",
       [u.id],
     )
   ).rows[0];
-  const selectedTld = reroll ? pending?.tld : requestedTld;
-  const market = selectedTld ? zoneMarkets(config).get(selectedTld) : undefined;
+  const selectedTld = reroll
+    ? (pending?.spin_mode ?? pending?.tld)
+    : requestedTld;
+  const market =
+    selectedTld === "random"
+      ? randomMarket(config)
+      : selectedTld
+        ? zoneMarkets(config).get(selectedTld)
+        : undefined;
   if (!market) throw new GameError(400, "Выберите доступную доменную зону");
   await c.query(
     "INSERT INTO zone_pity(user_id,tld,counter) VALUES($1,$2,0) ON CONFLICT DO NOTHING",
@@ -486,13 +521,21 @@ export async function spin(
       "SELECT tld,boost FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1",
     )
   ).rows[0];
-  const drop = generateForZone(
-    config,
-    selectedTld!,
-    pity,
-    undefined,
-    event?.tld === selectedTld ? Number(event.boost) : 1,
-  );
+  const drop =
+    selectedTld === "random"
+      ? generateRandom(
+          config,
+          pity,
+          undefined,
+          event ? { tld: event.tld, boost: Number(event.boost) } : undefined,
+        )
+      : generateForZone(
+          config,
+          selectedTld!,
+          pity,
+          undefined,
+          event?.tld === selectedTld ? Number(event.boost) : 1,
+        );
   const id = await recordDrop(
     c,
     { ...u, pity },

@@ -1,0 +1,192 @@
+.minimal-topbar {
+  justify-content: flex-end;
+}
+.minimal-topbar > .profile-chip,
+.minimal-topbar .icon-button {
+  display: none;
+}
+.app[data-page="spin"] .page-footer {
+  display: none;
+}
+.minimal-spin.generator {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  isolation: isolate;
+}
+.minimal-spin .zone-picker {
+  padding: 0;
+  width: 100%;
+  max-width: 650px;
+}
+.minimal-spin .zone-picker > label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  color: #8296b4;
+}
+.minimal-spin .zone-shortcuts {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.minimal-spin .zone-shortcuts > button {
+  font-size: 13px;
+  min-height: 57px;
+}
+.minimal-spin .zone-shortcuts > button:first-child {
+  font-size: 10px;
+  letter-spacing: 0.3px;
+}
+.minimal-spin .zone-shortcuts small {
+  font-size: 9px;
+}
+.minimal-spin .decryption-stage {
+  min-height: 300px;
+  padding: 26px 0 0;
+  justify-content: center;
+}
+.minimal-spin .decryption-stage .decrypt-card,
+.minimal-spin .decryption-stage[data-rarity] .decrypt-card {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  min-height: 130px;
+  width: 100%;
+  overflow: visible;
+  animation: none;
+}
+.minimal-spin .decrypt-card:before,
+.minimal-spin .decrypt-card:after {
+  display: none;
+}
+.minimal-spin .decrypt-surface {
+  min-height: 130px;
+  padding: 25px 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.minimal-spin .decrypt-name {
+  font-size: clamp(30px, 5.5vw, 60px);
+  letter-spacing: -1.5px;
+  max-width: 100%;
+}
+.minimal-spin .decoded-tld {
+  text-shadow: none;
+}
+.minimal-spin .decrypt-rewards {
+  min-height: 70px;
+  margin-top: 0;
+  gap: 8px;
+}
+.minimal-spin .decrypt-controls {
+  padding: 4px 0 25px;
+}
+.minimal-spin .decrypt-controls .spin-button {
+  max-width: 400px;
+  width: 100%;
+  min-height: 56px;
+}
+.minimal-spin .decrypt-result-actions {
+  padding: 0 0 22px;
+}
+.minimal-spin .result-actions {
+  max-width: 450px;
+}
+.minimal-spin .signal-message {
+  bottom: 1px;
+}
+.spin-settings {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 15px 0 22px;
+}
+.spin-settings button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.spin-extras > .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zone-table-wrap {
+  overflow: auto;
+  margin: 10px 0;
+}
+.zone-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.zone-table th {
+  font-size: 10px;
+  color: #738bae;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.zone-table th,
+.zone-table td {
+  padding: 12px 9px;
+  border-bottom: 1px solid #243047;
+}
+.zone-table td:first-child {
+  color: #b6cbed;
+  font-family: "Space Grotesk", monospace;
+}
+@media (max-width: 800px) {
+  .app[data-page="spin"] main {
+    padding-top: 25px;
+  }
+  .minimal-topbar {
+    height: 65px;
+  }
+}
+@media (max-width: 520px) {
+  .minimal-spin .zone-shortcuts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .minimal-spin .zone-shortcuts > button {
+    min-height: 52px;
+    font-size: 14px;
+  }
+  .minimal-spin .zone-shortcuts > button:first-child {
+    font-size: 11px;
+  }
+  .minimal-spin .zone-shortcuts small {
+    font-size: 10px;
+  }
+  .minimal-spin .decryption-stage {
+    min-height: 240px;
+    padding-top: 15px;
+  }
+  .minimal-spin .decrypt-name {
+    font-size: clamp(27px, 9vw, 40px);
+  }
+  .minimal-spin .decrypt-controls .spin-button {
+    max-width: none;
+    min-height: 54px;
+  }
+  .minimal-spin .decrypt-surface {
+    padding: 20px 0;
+  }
+  .minimal-spin .zone-picker > select {
+    font-size: 12px;
+  }
+  .zone-table {
+    font-size: 11px;
+  }
+  .zone-table th,
+  .zone-table td {
+    padding: 11px 5px;
+  }
+  .spin-settings > .secondary {
+    flex: 1;
+    font-size: 11px;
+  }
+}

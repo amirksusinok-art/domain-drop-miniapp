@@ -26,5 +26,8 @@ export async function migrate(db: Database) {
       );
       await c.query("INSERT INTO schema_migrations(version) VALUES(2)");
     }
+    await c.query(
+      "INSERT INTO schema_migrations(version) VALUES(3) ON CONFLICT DO NOTHING",
+    );
   });
 }

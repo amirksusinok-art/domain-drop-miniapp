@@ -36,6 +36,7 @@ import {
 import type { Auction, Domain, State } from "../shared/types";
 import { rarities } from "../shared/types";
 import { SpinPanel } from "./SpinPanel";
+import { SpinExtras } from "./SpinExtras";
 import { api, authenticate, mutation } from "./api";
 import { setupTelegram } from "./telegram";
 import { DomainCard, Empty, SectionTitle, colors, number } from "./components";
@@ -70,6 +71,22 @@ export function App() {
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [page, setPage] = useState<Page>("spin");
+  const [fast, setFast] = useState(() => {
+    try {
+      return localStorage.getItem("domain-drop-fast-spin") === "true";
+    } catch {
+      return false;
+    }
+  });
+  function toggleFast() {
+    setFast((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("domain-drop-fast-spin", String(next));
+      } catch {}
+      return next;
+    });
+  }
   const [rerollFrom, setRerollFrom] = useState<Domain | null>(null);
   const [rolling, setRolling] = useState(false),
     [sound, setSound] = useState(false),
@@ -189,7 +206,7 @@ export function App() {
   const p = state.profile;
   const locked = busy || rolling;
   return (
-    <div className="app" data-theme={p.theme}>
+    <div className="app" data-theme={p.theme} data-page={page}>
       <aside className="sidebar">
         <a
           className="brand"
@@ -211,29 +228,21 @@ export function App() {
           {(
             [
               ["spin", Disc3, "Генератор"],
-              ["collection", Layers3, "Коллекция"],
-              ["auction", Trophy, "Аукцион"],
-              ["scanner", ScanLine, "Scanner"],
-              ["quests", Target, "Задания"],
-              ["leaderboard", Star, "Рейтинг"],
               ["more", Menu, "Ещё"],
             ] as const
           ).map(([key, Icon, label]) => (
             <button
               key={key}
-              className={page === key ? "active" : ""}
+              className={
+                page === key || (key === "more" && page !== "spin")
+                  ? "active"
+                  : ""
+              }
               disabled={rolling}
               onClick={() => navigate(key)}
             >
               <Icon size={19} />
               {label}
-              {key === "quests" && (
-                <span className="nav-count">
-                  {state.quests.filter(
-                    (q) => !q.claimed && q.progress >= q.target,
-                  ).length || ""}
-                </span>
-              )}
             </button>
           ))}
         </nav>
@@ -247,7 +256,9 @@ export function App() {
         </div>
       </aside>
       <div className="workspace">
-        <header className="topbar">
+        <header
+          className={"topbar " + (page === "spin" ? "minimal-topbar" : "")}
+        >
           <button className="profile-chip" onClick={() => navigate("profile")}>
             <span className="avatar">{p.first_name.slice(0, 1)}</span>
             <span>
@@ -272,94 +283,18 @@ export function App() {
         </header>
         <main>
           {page === "spin" && (
-            <>
-              <SectionTitle
-                eyebrow="THE NEXT ONE COULD BE YOURS"
-                title="Поймай свой домен."
-              >
-                <span className="live-label">
-                  <i /> DOMAIN GENERATOR
-                </span>
-              </SectionTitle>
-              {!p.onboarded && !state.pending && (
-                <div className="welcome">
-                  <Sparkles size={22} />
-                  <div>
-                    <b>Твоя коллекция начинается здесь</b>
-                    <p>
-                      Вращай, находи редкие домены, сохраняй или продавай за
-                      coins. Первое вращение — в подарок.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <SpinPanel
-                state={state}
-                previous={rerollFrom}
-                rolling={rolling}
-                busy={busy}
-                sound={sound}
-                onDone={() => setRolling(false)}
-                act={act}
-                onDetails={() => setSelected(state.pending)}
-                onScanner={() => navigate("scanner")}
-              />
-              <div className="home-grid">
-                <button
-                  className="daily-promo"
-                  disabled={busy || p.daily_claimed}
-                  onClick={() => act("/daily")}
-                >
-                  <span className="promo-icon">
-                    <Coins />
-                  </span>
-                  <div>
-                    <span className="eyebrow">ЕЖЕДНЕВНЫЙ БОНУС</span>
-                    <h3>
-                      {p.daily_claimed
-                        ? "До завтра!"
-                        : `+${number(state.config.dailyReward)} coins`}
-                    </h3>
-                    <p>
-                      {p.daily_claimed
-                        ? "Новая награда в 00:00 UTC"
-                        : "Забери награду и продолжай охоту"}
-                    </p>
-                  </div>
-                  {p.daily_claimed ? <Check /> : <ArrowUp />}
-                </button>
-                <button
-                  className="collection-promo"
-                  onClick={() => navigate("collection")}
-                >
-                  <div>
-                    <span className="eyebrow">ТВОЯ КОЛЛЕКЦИЯ</span>
-                    <h3>
-                      {p.collection_count} <small>доменов</small>
-                    </h3>
-                    <p>Каждая находка — твоя история</p>
-                  </div>
-                  <Layers3 size={32} />
-                </button>
-              </div>
-              <div className="discover-heading">
-                <h3>За чем охотимся</h3>
-                <span>Примеры редких находок</span>
-              </div>
-              <div className="preview-grid">
-                {[
-                  { name: "777", tld: "ai", rarity: "LEGENDARY" },
-                  { name: "game", tld: "gg", rarity: "EPIC" },
-                  { name: "888", tld: "com", rarity: "MYTHIC" },
-                ].map((d) => (
-                  <DomainCard key={d.name} domain={d} />
-                ))}
-              </div>
-              <p className="fine-print">
-                Домены — виртуальные коллекционные предметы. Их нельзя улучшать,
-                регистрировать или обменивать на реальные деньги.
-              </p>
-            </>
+            <SpinPanel
+              state={state}
+              previous={rerollFrom}
+              rolling={rolling}
+              busy={busy}
+              sound={sound}
+              fast={fast}
+              onDone={() => setRolling(false)}
+              act={act}
+              onDetails={() => setSelected(state.pending)}
+              onScanner={() => navigate("scanner")}
+            />
           )}
           {page === "collection" && (
             <Collection
@@ -498,6 +433,68 @@ export function App() {
                 eyebrow="ЕЩЁ БОЛЬШЕ DOMAIN DROP"
                 title="Твой мир доменов"
               />
+              <div className="home-grid">
+                <button
+                  className="daily-promo"
+                  disabled={busy || p.daily_claimed}
+                  onClick={() => act("/daily")}
+                >
+                  <span className="promo-icon">
+                    <Coins />
+                  </span>
+                  <div>
+                    <span className="eyebrow">ЕЖЕДНЕВНЫЙ БОНУС</span>
+                    <h3>
+                      {p.daily_claimed
+                        ? "До завтра!"
+                        : `+${number(state.config.dailyReward)} coins`}
+                    </h3>
+                    <p>
+                      {p.daily_claimed
+                        ? "Новая награда в 00:00 UTC"
+                        : "Забери награду и продолжай охоту"}
+                    </p>
+                  </div>
+                  {p.daily_claimed ? <Check /> : <ArrowUp />}
+                </button>
+                <button
+                  className="collection-promo"
+                  onClick={() => navigate("collection")}
+                >
+                  <div>
+                    <span className="eyebrow">ТВОЯ КОЛЛЕКЦИЯ</span>
+                    <h3>
+                      {p.collection_count} <small>доменов</small>
+                    </h3>
+                    <p>Каждая находка — твоя история</p>
+                  </div>
+                  <Layers3 size={32} />
+                </button>
+              </div>
+              <div className="discover-heading">
+                <h3>За чем охотимся</h3>
+                <span>Примеры редких находок</span>
+              </div>
+              <div className="preview-grid">
+                {[
+                  { name: "777", tld: "ai", rarity: "LEGENDARY" },
+                  { name: "game", tld: "gg", rarity: "EPIC" },
+                  { name: "888", tld: "com", rarity: "MYTHIC" },
+                ].map((d) => (
+                  <DomainCard key={d.name} domain={d} />
+                ))}
+              </div>
+              <p className="fine-print">
+                Домены — виртуальные коллекционные предметы. Их нельзя улучшать,
+                регистрировать или обменивать на реальные деньги.
+              </p>
+              <SpinExtras
+                state={state}
+                fast={fast}
+                sound={sound}
+                onFast={toggleFast}
+                onSound={() => setSound(!sound)}
+              />
               <div className="menu-grid">
                 {(
                   [
@@ -523,6 +520,9 @@ export function App() {
                       icon: Grid2X2,
                       title: "Коллекционные наборы",
                     },
+                    { page: "auction", icon: Trophy, title: "Аукцион" },
+                    { page: "scanner", icon: ScanLine, title: "Scanner" },
+                    { page: "quests", icon: Target, title: "Задания" },
                     { page: "themes", icon: Sparkles, title: "Темы" },
                     { page: "events", icon: Radio, title: "События" },
                     { page: "achievements", icon: Trophy, title: "Достижения" },
@@ -569,18 +569,18 @@ export function App() {
         {(
           [
             ["spin", Disc3, "Генератор"],
-            ["collection", Layers3, "Коллекция"],
-            ["auction", Trophy, "Аукцион"],
-            ["quests", Target, "Задания"],
             ["more", Menu, "Ещё"],
           ] as const
         ).map(([key, Icon, label]) => (
           <button
             key={key}
-            className={page === key ? "active" : ""}
+            className={
+              page === key || (key === "more" && page !== "spin")
+                ? "active"
+                : ""
+            }
             disabled={rolling}
             onClick={() => {
-              if (key === "collection") setCollectionFilter("all");
               navigate(key);
             }}
           >

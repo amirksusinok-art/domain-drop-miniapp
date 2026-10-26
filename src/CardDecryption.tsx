@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Globe2, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { Sparkles, Zap } from "lucide-react";
 import type { Domain } from "../shared/types";
 import { haptic } from "./telegram";
 import { colors, number } from "./components";
@@ -149,8 +149,7 @@ export function CardDecryption({
   const stage = actual.stage,
     domainReady = !!result && reached(stage, "multiplier"),
     rarityReady = !!result && reached(stage, "rarity"),
-    valueReady = !!result && reached(stage, "value"),
-    tagsReady = !!result && reached(stage, "tags");
+    valueReady = !!result && reached(stage, "value");
   const destroying = animating && stage === "destroying" && previous;
   const display = destroying ? previous : result;
   const oldLocked = destroying
@@ -217,15 +216,6 @@ export function CardDecryption({
       data-stage={waiting ? "waiting" : !result && !animating ? "idle" : stage}
       data-rarity={rarity}
     >
-      <div className="data-stream" aria-hidden="true">
-        {["DNS / 0X71", "NODE / A8F2", "TLD / RESOLVE", "SIGNAL / 1F04"].map(
-          (s, i) => (
-            <span key={s} style={{ "--stream-index": i } as CSSProperties}>
-              {s}
-            </span>
-          ),
-        )}
-      </div>
       <div
         className="decrypt-card"
         style={
@@ -236,14 +226,6 @@ export function CardDecryption({
           } as CSSProperties
         }
       >
-        <div className="decrypt-card-top">
-          <span>
-            <Globe2 size={16} />{" "}
-            {domainReady ? "VERIFIED ASSET" : "ENCRYPTED ASSET"}
-          </span>
-          <span className="decrypt-indicator" />
-          <span>DD / 001</span>
-        </div>
         <button
           type="button"
           className="decrypt-surface"
@@ -275,24 +257,9 @@ export function CardDecryption({
             ? `${result.name}.${result.tld}`
             : "Зашифрованная карточка домена"}
         </span>
-        <div className="decrypt-status" id="decryption-status">
-          <span
-            className={
-              animating || waiting ? "status-dot working" : "status-dot"
-            }
-          />
+        <span className="sr-only" id="decryption-status" role="status">
           {status}
-          <span className="decrypt-hint">
-            {animating
-              ? accelerated
-                ? "FAST TRACK"
-                : "ТАП — УСКОРИТЬ"
-              : result
-                ? "VERIFIED"
-                : "READY"}
-          </span>
-        </div>
-        {animating && <div className="decrypt-scanline" aria-hidden="true" />}
+        </span>
         {rarityReady &&
           ["EPIC", "LEGENDARY", "MYTHIC"].includes(result!.rarity) && (
             <div className="decrypt-particles" aria-hidden="true">
@@ -303,17 +270,6 @@ export function CardDecryption({
           )}
       </div>
       <div className="decrypt-rewards" aria-live="polite" aria-atomic="true">
-        <div
-          className={"reveal-layer " + (domainReady ? "is-revealed" : "")}
-          aria-hidden={!domainReady}
-        >
-          {domainReady && (
-            <span className="multiplier-reveal">
-              .{result!.tld.toUpperCase()} MULTIPLIER{" "}
-              <b>×{result!.breakdown.tldMultiplier}</b>
-            </span>
-          )}
-        </div>
         <div
           className={"reveal-layer " + (rarityReady ? "is-revealed" : "")}
           aria-hidden={!rarityReady}
@@ -349,26 +305,7 @@ export function CardDecryption({
             </>
           )}
         </div>
-        <div
-          className={
-            "reveal-layer decrypt-tags " + (tagsReady ? "is-revealed" : "")
-          }
-          aria-hidden={!tagsReady}
-        >
-          {tagsReady && (
-            <div className="tags">
-              {result!.tags.map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
-      {!result && !animating && (
-        <p className="decrypt-idle-copy">
-          <ShieldCheck size={13} /> Один сигнал. Твой следующий домен.
-        </p>
-      )}
     </div>
   );
 }
