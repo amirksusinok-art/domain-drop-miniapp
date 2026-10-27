@@ -16,6 +16,8 @@ const tldSchema = z.object({
 export const configSchema = z
   .object({
     spinPrice: z.number().int().min(100).max(100000),
+    zonePriceBase: z.number().int().min(100).max(100000).optional(),
+    targetRtp: z.number().min(0.1).max(0.99).optional(),
     startingBalance: z.number().int().min(0).max(1000000),
     dailyReward: z.number().int().min(0).max(10000),
     pityGuarantee: z.number().int().min(10).max(100),
@@ -43,8 +45,29 @@ export const configSchema = z
       ctx.addIssue({ code: "custom", message: "Duplicate TLD" });
   });
 export type Config = z.infer<typeof configSchema>;
+export const revisedPrices: Record<string, number> = {
+  xyz: 250,
+  site: 250,
+  online: 250,
+  ru: 350,
+  ua: 350,
+  uk: 450,
+  me: 550,
+  net: 700,
+  org: 700,
+  gg: 950,
+  co: 1100,
+  io: 1400,
+  ai: 2300,
+  com: 3500,
+};
+export const revisedZonePrice = (name: string, oldPrice: number) =>
+  revisedPrices[name] ??
+  Math.min(1000000, Math.max(100, Math.round((oldPrice * 1.5) / 50) * 50));
 export const defaultConfig: Config = {
-  spinPrice: 500,
+  spinPrice: 750,
+  zonePriceBase: 750,
+  targetRtp: 0.8,
   startingBalance: 50000,
   dailyReward: 1000,
   pityGuarantee: 30,
@@ -141,6 +164,10 @@ export const defaultConfig: Config = {
     weight: Number(weight),
     multiplier: Number(multiplier),
     score: Number(score),
+    spinPrice: revisedZonePrice(
+      String(name),
+      Math.max(100, Math.round((500 * Number(multiplier) ** 2) / 100) * 50),
+    ),
   })),
 };
 export type Drop = {
@@ -428,7 +455,9 @@ export function generate(
   const candidates = pool.filter((p) => p.drop.rarity === rarity);
   const selected = pick(
     candidates,
-    (p) => p.weight * (event?.tld === p.drop.tld ? event.boost : 1),
+    (p) =>
+      p.weight *
+      (event?.tld === p.drop.tld ? Math.min(1.3, Math.max(1, event.boost)) : 1),
     rng,
   ).drop;
   if (selected.rarity === "COMMON") {

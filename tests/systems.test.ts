@@ -245,7 +245,7 @@ test("Quick Sell upgrades debit once, rules intersect, protected drops stay, sel
   assert.ok(upgrades.every((r) => r.status === 200));
   let st = (await req(a.token, "/state")).body;
   assert.equal(st.quickSell.level, 1);
-  assert.equal(st.profile.coins, 49000);
+  assert.equal(st.profile.coins, 47000);
   let rules = { ...st.quickSell.rules, enabled: true };
   assert.equal((await req(a.token, "/quick/settings", rules)).status, 200);
   const ordinary = drop("ordinary928", "xyz");
@@ -277,7 +277,7 @@ test("Quick Sell upgrades debit once, rules intersect, protected drops stay, sel
   assert.equal(pick.status, 200);
   assert.equal(pick.body.state.pending.quick_sold, true);
   assert.equal(pick.body.state.pending.status, "sold");
-  assert.equal(pick.body.state.profile.coins, 49000 + ordinary.value);
+  assert.equal(pick.body.state.profile.coins, 47000 + ordinary.value);
   await db.query(
     "UPDATE users SET last_spin_at=now()-interval '2 seconds' WHERE id=$1",
     [a.userId],
@@ -502,4 +502,64 @@ test("Administrator access cannot be accidentally removed by an in-game ban", as
   });
   assert.equal(response.status, 409);
   assert.equal((await req(admin.token, "/state")).status, 200);
+});
+
+test("Quick Sell progression requires historical ordinary SPIN and preserves already purchased levels", async () => {
+  const a = await user(915);
+  assert.equal((await req(a.token, "/quick/upgrade", {})).status, 200);
+  assert.equal((await req(a.token, "/quick/upgrade", {})).status, 409);
+  await db.query("UPDATE users SET spins=50 WHERE id=$1", [a.userId]);
+  assert.equal((await req(a.token, "/quick/upgrade", {})).status, 200);
+  assert.equal((await req(a.token, "/state")).body.profile.coins, 39500);
+  assert.equal((await req(a.token, "/state")).body.quickSell.level, 2);
+  assert.equal((await req(a.token, "/quick/upgrade", {})).status, 409);
+});
+test("Rebalance migration preserves coins, domain value and Quick Sell levels; caps old events and does not rerun", async () => {
+  const a = await user(916);
+  await db.query("UPDATE users SET quick_level=4 WHERE id=$1", [a.userId]);
+  const d = await db.transaction((c) =>
+    game.insertDomain(c, a.userId, drop(), "kept", "spin"),
+  );
+  const before = (await db.query("SELECT value FROM domains WHERE id=$1", [d]))
+    .rows[0].value;
+  const old = {
+    ...defaultConfig,
+    spinPrice: 500,
+    tlds: defaultConfig.tlds.map((t) => ({
+      ...t,
+      spinPrice: Math.max(
+        100,
+        Math.round((500 * t.multiplier * t.multiplier) / 100) * 50,
+      ),
+    })),
+  };
+  delete (old as any).targetRtp;
+  await db.query("UPDATE settings SET config=$1 WHERE id=1", [
+    JSON.stringify(old),
+  ]);
+  await db.query(
+    "ALTER TABLE events DROP CONSTRAINT IF EXISTS events_boost_check",
+  );
+  await db.query(
+    "INSERT INTO events(id,title,description,tld,boost,starts_at,ends_at) VALUES($1,'Old event','','ai',10,now(),now()+interval '1 day')",
+    [randomUUID()],
+  );
+  await db.query("DELETE FROM schema_migrations WHERE version=5");
+  await migrate(db);
+  assert.equal((await game.configFor(db)).spinPrice, 750);
+  assert.equal((await game.configFor(db)).targetRtp, 0.8);
+  assert.equal((await req(a.token, "/state")).body.profile.coins, 50000);
+  assert.equal((await req(a.token, "/state")).body.quickSell.level, 4);
+  assert.equal(
+    (await db.query("SELECT value FROM domains WHERE id=$1", [d])).rows[0]
+      .value,
+    before,
+  );
+  assert.equal(
+    Number((await db.query("SELECT max(boost) AS b FROM events")).rows[0].b),
+    1.3,
+  );
+  const config = await game.configFor(db);
+  await migrate(db);
+  assert.deepEqual(await game.configFor(db), config);
 });

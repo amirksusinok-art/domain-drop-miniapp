@@ -307,7 +307,7 @@ export function App() {
           <button className="profile-chip" onClick={() => navigate("profile")}>
             <span className="avatar">{p.first_name.slice(0, 1)}</span>
             <span>
-              <b>{p.username ? "@" + p.username : p.first_name}</b>
+              <b>{p.first_name}</b>
               <small>УРОВЕНЬ {p.level}</small>
             </span>
           </button>
@@ -317,13 +317,6 @@ export function App() {
               <b>{number(p.coins)}</b>
               <small>coins</small>
             </span>
-            <button
-              className="icon-button"
-              aria-label={sound ? "Выключить звук" : "Включить звук"}
-              onClick={toggleSound}
-            >
-              {sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
-            </button>
           </div>
         </header>
         <main>

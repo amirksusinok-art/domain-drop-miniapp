@@ -42,69 +42,61 @@ export function revealTimeline(
       : fast && domain.rarity === "RARE"
         ? 1500
         : {
-            COMMON: 2700,
-            UNCOMMON: 2700,
-            RARE: 3100,
-            EPIC: 3500,
-            LEGENDARY: 4000,
-            MYTHIC: 4500,
+            COMMON: 1700,
+            UNCOMMON: 1900,
+            RARE: 2400,
+            EPIC: 3000,
+            LEGENDARY: 3600,
+            MYTHIC: 4000,
           }[domain.rarity];
+  const offset = reroll ? 350 : 0,
+    complete = target - 720,
+    nameEnd = fixedZone ? complete : Math.round(complete * 0.68);
   const frames: RevealFrame[] = [];
-  let at = 0,
-    nameLocked = 0,
-    tldLocked = 0;
-  const push = (stage: RevealStage) =>
-    frames.push({ at, stage, nameLocked, tldLocked });
-  push("initializing");
-  at += 250;
-  push("scramble");
-  at += 320;
-  for (let i = 1; i <= domain.name.length; i++) {
-    at += 700 / domain.name.length;
-    nameLocked = i;
-    push("name");
+  const add = (
+    at: number,
+    stage: RevealStage,
+    nameLocked: number,
+    tldLocked: number,
+  ) => frames.push({ at: at + offset, stage, nameLocked, tldLocked });
+  if (reroll)
+    frames.push({
+      at: 0,
+      stage: "destroying",
+      nameLocked: 0,
+      tldLocked: fixedZone ? domain.tld.length : 0,
+    });
+  const known = fixedZone ? domain.tld.length : 0;
+  add(0, "initializing", 0, known);
+  add(Math.round(complete * 0.12), "scramble", 0, known);
+  for (let i = 1; i <= domain.name.length; i++)
+    add(
+      Math.round(
+        complete * 0.25 +
+          ((nameEnd - complete * 0.25) * i) / domain.name.length,
+      ),
+      "name",
+      i,
+      known,
+    );
+  if (!fixedZone) {
+    add(nameEnd + 1, "signal", domain.name.length, 0);
+    add(nameEnd + 20, "tld", domain.name.length, 0);
+    for (let i = 1; i <= domain.tld.length; i++)
+      add(
+        Math.round(nameEnd + ((complete - nameEnd) * i) / domain.tld.length),
+        "tld",
+        domain.name.length,
+        i,
+      );
   }
-  at += 60;
-  push("signal");
-  at +=
-    domain.rarity === "MYTHIC"
-      ? 450
-      : domain.rarity === "LEGENDARY"
-        ? 350
-        : domain.rarity === "EPIC"
-          ? 240
-          : 180;
-  push("tld");
-  for (let i = 1; i <= domain.tld.length; i++) {
-    at += i === domain.tld.length ? 300 : 120;
-    tldLocked = i;
-    push("tld");
-  }
-  at += 120;
-  push("multiplier");
-  at += 120;
-  push("analyzing");
-  at += 300;
-  push("rarity");
-  at += 180;
-  push("value");
-  at += 180;
-  push("tags");
-  at += 180;
-  push("ready");
-  const offset = reroll ? 350 : 0;
-  return [
-    ...(reroll
-      ? [{ at: 0, stage: "destroying" as const, nameLocked: 0, tldLocked: 0 }]
-      : []),
-    ...frames
-      .filter((f) => !fixedZone || !["signal", "tld"].includes(f.stage))
-      .map((f) => ({
-        ...f,
-        tldLocked: fixedZone ? domain.tld.length : f.tldLocked,
-        at: Math.round((f.at / at) * target) + offset,
-      })),
-  ];
+  add(complete + 1, "multiplier", domain.name.length, domain.tld.length);
+  add(complete + 100, "analyzing", domain.name.length, domain.tld.length);
+  add(complete + 400, "rarity", domain.name.length, domain.tld.length);
+  add(target - 180, "value", domain.name.length, domain.tld.length);
+  add(target - 80, "tags", domain.name.length, domain.tld.length);
+  add(target, "ready", domain.name.length, domain.tld.length);
+  return frames;
 }
 export const stageOrder: RevealStage[] = [
   "destroying",

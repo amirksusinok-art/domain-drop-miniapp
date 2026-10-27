@@ -64,13 +64,20 @@ export function QuickSell({
             disabled={
               busy ||
               !state.systems.quickEnabled ||
-              state.profile.coins < state.systems.quickCosts[level]
+              state.profile.coins < state.systems.quickCosts[level] ||
+              state.profile.spins < state.systems.quickRequiredSpins[level]
             }
             onClick={() => act("/quick/upgrade")}
           >
             {level === 0 ? "Открыть" : "Уровень " + (level + 1)} ·{" "}
             {number(state.systems.quickCosts[level])} coins
           </button>
+        )}
+        {level < state.systems.quickMaxLevel && (
+          <p className="muted">
+            Для следующего уровня: {state.profile.spins} /{" "}
+            {state.systems.quickRequiredSpins[level]} SPIN
+          </p>
         )}
         <label className="check-row">
           <input
@@ -734,6 +741,8 @@ function EconomyEditor({
       {[
         ["startingBalance", "STARTING BALANCE"],
         ["spinPrice", "RANDOM Spin Price"],
+        ["zonePriceBase", "База цены новых зон"],
+        ["targetRtp", "Целевой RTP (0.8 = 80%)"],
         ["dailyReward", "Daily Reward"],
         ["dailyRerolls", "Daily Re-roll (0–1)"],
         ["pityStart", "Pity Start"],
@@ -925,6 +934,18 @@ function SystemSettings({
             setCfg({
               ...cfg,
               quickCosts: e.target.value.split(",").map(Number),
+            })
+          }
+        />
+      </label>
+      <label>
+        Требования SPIN для пяти уровней
+        <input
+          value={cfg.quickRequiredSpins.join(",")}
+          onChange={(e) =>
+            setCfg({
+              ...cfg,
+              quickRequiredSpins: e.target.value.split(",").map(Number),
             })
           }
         />

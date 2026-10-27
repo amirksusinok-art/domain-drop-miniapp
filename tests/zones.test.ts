@@ -32,8 +32,8 @@ test("Affordable zones are cheaper with higher Rare+ odds, premium zones pay mor
   const markets = zoneMarkets(defaultConfig),
     ua = markets.get("ua")!,
     com = markets.get("com")!;
-  assert.equal(ua.spinPrice, 200);
-  assert.equal(com.spinPrice, 2250);
+  assert.equal(ua.spinPrice, 350);
+  assert.equal(com.spinPrice, 3500);
   assert.ok(ua.baseRareChance > com.baseRareChance);
   const same = (zone: typeof ua) =>
     zone.buckets.flat().find((d) => d.name === "777")!;
@@ -59,7 +59,7 @@ test("Every selected zone stays fixed and its guarantee works even in low tier T
   }
   assert.throws(() => generateForZone(defaultConfig, "invalidzone", 0));
 });
-test("Selected-zone economy targets 85% RTP including its own pity sequence", () => {
+test("Selected-zone economy targets 80% RTP including its own pity sequence", () => {
   for (const tld of ["xyz", "ua", "ai", "com"]) {
     let seed = 72531;
     const rng = () => {
@@ -76,7 +76,7 @@ test("Selected-zone economy targets 85% RTP including its own pity sequence", ()
       pity = rarities.indexOf(d.rarity) >= 2 ? 0 : pity + 1;
     }
     const rtp = total / n / zone.spinPrice;
-    assert.ok(rtp > 0.79 && rtp < 0.91, `${tld}: ${rtp}`);
+    assert.ok(rtp > 0.75 && rtp < 0.85, `${tld}: ${rtp}`);
   }
 });
 test("RANDOM chooses real zones on the server and has its own calibrated payout", () => {
@@ -90,7 +90,7 @@ test("RANDOM chooses real zones on the server and has its own calibrated payout"
   let pity = 0,
     total = 0;
   const n = 150000;
-  assert.equal(mode.spinPrice, 500);
+  assert.equal(mode.spinPrice, 750);
   assert.ok(Math.abs(randomChance(defaultConfig, 29) - 1) < 1e-10);
   for (let i = 0; i < n; i++) {
     const drop = generateRandom(defaultConfig, pity, rng, undefined, mode);
@@ -101,6 +101,54 @@ test("RANDOM chooses real zones on the server and has its own calibrated payout"
   }
   assert.equal(found.size, 81);
   assert.ok(
-    total / n / mode.spinPrice > 0.79 && total / n / mode.spinPrice < 0.91,
+    total / n / mode.spinPrice > 0.75 && total / n / mode.spinPrice < 0.85,
   );
+});
+
+test("RANDOM price is independent of every fixed zone and RTP target adjusts only new snapshots", () => {
+  const old = zoneMarkets(defaultConfig).get("ai")!;
+  const changed = { ...defaultConfig, spinPrice: 1200 };
+  assert.equal(zoneMarkets(changed).get("ai")!.spinPrice, 2300);
+  const lower = zoneMarkets({ ...defaultConfig, targetRtp: 0.7 }).get("ai")!;
+  const pick = (z: typeof old) =>
+    z.buckets.flat().find((d) => d.name === "777")!;
+  assert.ok(pick(lower).value < pick(old).value);
+  assert.equal(
+    pick(old).value,
+    zoneMarkets(defaultConfig)
+      .get("ai")!
+      .buckets.flat()
+      .find((d) => d.name === "777")!.value,
+  );
+});
+test("Events adjust RANDOM TLD frequency only and clamp to 30 percent relative weight", () => {
+  const event = { tld: "ai", boost: 1.3 };
+  const base = randomMarket(defaultConfig),
+    total = base.entries.reduce(
+      (s, e) => s + e.weight * (e.zone.name === "ai" ? 1.3 : 1),
+      0,
+    );
+  const expected = base.entries.reduce(
+    (s, e) =>
+      s +
+      ((e.weight * (e.zone.name === "ai" ? 1.3 : 1)) / total) *
+        chanceFor(e.zone, defaultConfig, 10),
+    0,
+  );
+  assert.ok(
+    Math.abs(randomChance(defaultConfig, 10, event) - expected) < 1e-12,
+  );
+  assert.equal(
+    randomChance(defaultConfig, 10, { tld: "ai", boost: 10 }),
+    randomChance(defaultConfig, 10, event),
+  );
+  const fixed = zoneMarkets(defaultConfig).get("ai")!;
+  let draw = 0;
+  const rng = () => (++draw === 1 ? 0.99999 : 0);
+  const ordinary = generateRandom(defaultConfig, 0, rng, {
+    tld: "ai",
+    boost: 10,
+  });
+  assert.ok(rarities.includes(ordinary.rarity));
+  assert.equal(chanceFor(fixed, defaultConfig, 0), fixed.baseRareChance);
 });

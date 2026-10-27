@@ -346,6 +346,7 @@ export async function state(c: DBClient, userId: string): Promise<State> {
       spinPrice: config.spinPrice,
       dailyReward: config.dailyReward,
       pityGuarantee: config.pityGuarantee,
+      pityStart: config.pityStart,
       zones: [
         ...[...zoneMarkets(config).values()].map((zone) => {
           const pity = zonePity.find((p) => p.tld === zone.name)?.counter ?? 0;
@@ -354,14 +355,7 @@ export async function state(c: DBClient, userId: string): Promise<State> {
             spinPrice: zone.spinPrice,
             multiplier: zone.multiplier,
             baseRareChance: zone.baseRareChance,
-            rareChance: chanceFor(
-              zone,
-              config,
-              pity,
-              activeEvents[0]?.tld === zone.name
-                ? Number(activeEvents[0].boost)
-                : 1,
-            ),
+            rareChance: chanceFor(zone, config, pity),
             pity,
           };
         }),
@@ -369,7 +363,16 @@ export async function state(c: DBClient, userId: string): Promise<State> {
           name: "random",
           spinPrice: randomMarket(config).spinPrice,
           multiplier: null,
-          baseRareChance: randomMarket(config).baseRareChance,
+          baseRareChance: randomChance(
+            config,
+            0,
+            activeEvents[0]
+              ? {
+                  tld: activeEvents[0].tld,
+                  boost: Number(activeEvents[0].boost),
+                }
+              : undefined,
+          ),
           rareChance: randomChance(
             config,
             zonePity.find((p) => p.tld === "random")?.counter ?? 0,
@@ -590,13 +593,7 @@ export async function spin(
           undefined,
           event ? { tld: event.tld, boost: Number(event.boost) } : undefined,
         )
-      : generateForZone(
-          config,
-          selectedTld!,
-          pity,
-          undefined,
-          event && event.tld === selectedTld ? Number(event.boost) : 1,
-        );
+      : generateForZone(config, selectedTld!, pity, undefined, 1);
   const id = await recordDrop(
     c,
     { ...u, pity },

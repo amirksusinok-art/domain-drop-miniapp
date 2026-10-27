@@ -787,7 +787,7 @@ export function Admin({
     [validation, setValidation] = useState(""),
     [title, setTitle] = useState("AI WEEK"),
     [tld, setTld] = useState("ai"),
-    [boost, setBoost] = useState(2),
+    [boost, setBoost] = useState(1.15),
     [auctionName, setAuctionName] = useState("777"),
     [auctionTld, setAuctionTld] = useState("ai"),
     [auctionPrice, setAuctionPrice] = useState(15000);
@@ -846,11 +846,12 @@ export function Admin({
             <input value={tld} onChange={(e) => setTld(e.target.value)} />
           </label>
           <label>
-            Множитель веса
+            Вес TLD в RANDOM (×1–1.3)
             <input
               type="number"
               min={1}
-              max={10}
+              max={1.3}
+              step={0.05}
               value={boost}
               onChange={(e) => setBoost(Number(e.target.value))}
             />
@@ -865,7 +866,7 @@ export function Admin({
               title,
               tld,
               boost,
-              description: `Повышенный шанс .${tld} среди доменов одной редкости`,
+              description: `Зона .${tld} чаще встречается в RANDOM. Редкость не усилена.`,
               startsAt: new Date().toISOString(),
               endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
             })

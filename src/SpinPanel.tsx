@@ -34,6 +34,8 @@ export function SpinPanel({
       return "random";
     }
   });
+  const [allZones, setAllZones] = useState(false),
+    [zoneSearch, setZoneSearch] = useState("");
   const p = state.profile,
     locked = busy || rolling || state.account.frozen,
     zones = state.config.zones;
@@ -46,6 +48,7 @@ export function SpinPanel({
   }, [pendingMode]);
   function choose(name: string) {
     setChosen(name);
+    setAllZones(false);
     try {
       localStorage.setItem("domain-drop-zone", name);
     } catch {
@@ -68,57 +71,69 @@ export function SpinPanel({
         </p>
       )}
       <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
-        <label htmlFor="spin-zone">
-          ЗОНА{" "}
-          {state.pending
-            ? pendingMode === "random"
+        <div className="selected-zone">
+          <span>
+            {selected?.name === "random"
               ? "RANDOM"
-              : "." + state.pending.tld
-            : ""}
-        </label>
-        <select
-          id="spin-zone"
-          value={selected?.name ?? ""}
-          disabled={locked || !!state.pending || !!state.scanner}
-          onChange={(e) => choose(e.target.value)}
-        >
-          <option value="" disabled>
-            Выбери зону
-          </option>
-          {[...zones]
-            .sort((a, b) =>
-              a.name === "random"
-                ? -1
-                : b.name === "random"
-                  ? 1
-                  : a.spinPrice - b.spinPrice || a.name.localeCompare(b.name),
-            )
-            .map((z) => (
-              <option key={z.name} value={z.name}>
-                {z.name === "random" ? "RANDOM" : "." + z.name} ·{" "}
-                {number(z.spinPrice)} coins
-              </option>
-            ))}
-        </select>
-        <div className="zone-shortcuts">
-          {["random", "ua", "ru", "xyz", "uk", "io", "ai", "com"].map(
-            (name) => {
-              const z = zones.find((z) => z.name === name);
-              return z ? (
-                <button
-                  type="button"
-                  className={selected?.name === name ? "active" : ""}
-                  key={name}
-                  disabled={locked || !!state.pending || !!state.scanner}
-                  onClick={() => choose(name)}
-                >
-                  {name === "random" ? "RANDOM" : "." + name}
-                  <small>{number(z.spinPrice)} ◈</small>
-                </button>
-              ) : null;
-            },
-          )}
+              : "." + selected?.name.toUpperCase()}
+          </span>
+          <small>{number(selected?.spinPrice ?? 0)} coins</small>
         </div>
+        <div className="zone-shortcuts">
+          {["random", "xyz", "uk", "gg", "io", "ai", "com"]
+            .map((name) => zones.find((z) => z.name === name))
+            .filter((z) => !!z)
+            .map((z) => (
+              <button
+                type="button"
+                key={z.name}
+                aria-pressed={selected?.name === z.name}
+                className={selected?.name === z.name ? "active" : ""}
+                disabled={locked || !!state.pending || !!state.scanner}
+                onClick={() => choose(z.name)}
+              >
+                {z.name === "random" ? "RANDOM" : "." + z.name}
+              </button>
+            ))}
+          <button
+            type="button"
+            aria-expanded={allZones}
+            disabled={locked || !!state.pending || !!state.scanner}
+            onClick={() => setAllZones(!allZones)}
+          >
+            ALL TLD
+          </button>
+        </div>
+        {allZones && (
+          <div className="all-tld">
+            <input
+              aria-label="Поиск доменной зоны"
+              placeholder="Найти зону"
+              value={zoneSearch}
+              onChange={(e) =>
+                setZoneSearch(e.target.value.toLowerCase().replaceAll(".", ""))
+              }
+            />
+            <div
+              className="zone-chips"
+              role="group"
+              aria-label="Все доменные зоны"
+            >
+              {zones
+                .filter((z) => z.name.includes(zoneSearch))
+                .map((z) => (
+                  <button
+                    type="button"
+                    key={z.name}
+                    aria-pressed={selected?.name === z.name}
+                    onClick={() => choose(z.name)}
+                  >
+                    {z.name === "random" ? "RANDOM" : "." + z.name}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
       <CardDecryption
         selectedZone={selected?.name ?? "random"}
@@ -135,16 +150,33 @@ export function SpinPanel({
         onDetails={onDetails}
       />
       <div
-        className="compact-luck"
+        className={
+          "compact-luck " +
+          ((selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
+            ? "quiet"
+            : "")
+        }
         aria-label={`Luck: ${selected?.pity ?? 0} из ${state.config.pityGuarantee}`}
       >
         <span>
-          LUCK ·{" "}
-          {selected && selected.rareChance >= 1
-            ? "RARE+ ГАРАНТИРОВАН"
-            : selected && selected.rareChance > selected.baseRareChance
-              ? "BOOSTED"
-              : "NORMAL"}
+          {(selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
+            ? "LUCK"
+            : (selected?.pity ?? 0) >= state.config.pityGuarantee - 1
+              ? "RARE+ ГАРАНТИРОВАН"
+              : (selected?.pity ?? 0) >= state.config.pityGuarantee - 4
+                ? "RARE+ CLOSE"
+                : (selected?.pity ?? 0) >= state.config.pityStart
+                  ? "LUCK +" +
+                    Math.max(
+                      0,
+                      Math.round(
+                        ((selected?.rareChance ?? 0) -
+                          (selected?.baseRareChance ?? 0)) *
+                          100,
+                      ),
+                    ) +
+                    "%"
+                  : "LUCK BUILDING"}
         </span>
         <progress
           max={state.config.pityGuarantee}

@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Sparkles, Zap } from "lucide-react";
 import type { Domain } from "../shared/types";
@@ -72,13 +73,16 @@ export function CardDecryption({
       lastTick = 0;
     const click = (impact = false) => {
       if (reduced) return;
-      haptic(
-        impact
-          ? ["LEGENDARY", "MYTHIC"].includes(result.rarity)
-            ? "heavy"
-            : "medium"
-          : "light",
-      );
+      if (impact)
+        haptic(
+          impact
+            ? ["LEGENDARY", "MYTHIC"].includes(result.rarity)
+              ? "heavy"
+              : result.rarity === "EPIC"
+                ? "medium"
+                : "light"
+            : "light",
+        );
       if (!soundRef.current) return;
       try {
         audio.current ??= new AudioContext();
@@ -118,11 +122,14 @@ export function CardDecryption({
           next.tldLocked > before.tldLocked
         ) {
           setPulse((p) => p + 1);
-          click(
-            next.tldLocked === result.tld.length &&
-              before.tldLocked < next.tldLocked,
-          );
+          click(false);
         }
+        if (
+          next.stage === "rarity" &&
+          before.stage !== "rarity" &&
+          result.rarity !== "COMMON"
+        )
+          click(true);
         // Preserve each reveal layer for at least one rendered frame, even
         // when a tap or a backgrounded WebView advances the clock far ahead.
         if (next.stage !== before.stage) break;
@@ -194,12 +201,7 @@ export function CardDecryption({
           initializing: "INITIALIZING…",
           scramble: "RESOLVING DOMAIN…",
           name: "LOCKING CHARACTERS…",
-          signal:
-            result?.rarity === "MYTHIC"
-              ? "UNKNOWN SIGNAL"
-              : result?.rarity === "LEGENDARY"
-                ? "SIGNAL FOUND"
-                : "NAME RESOLVED",
+          signal: "NAME RESOLVED",
           tld: "RESOLVING TLD…",
           multiplier: "TLD VERIFIED",
           analyzing: "ANALYZING…",
@@ -215,7 +217,9 @@ export function CardDecryption({
   }
   const rarity = rarityReady ? result!.rarity : "hidden";
   const dim =
-    animating && result?.rarity === "MYTHIC" && reached(stage, "signal");
+    animating &&
+    ["LEGENDARY", "MYTHIC"].includes(result?.rarity ?? "") &&
+    stage === "analyzing";
   return (
     <div
       className={
@@ -226,6 +230,16 @@ export function CardDecryption({
       data-stage={waiting ? "waiting" : !result && !animating ? "idle" : stage}
       data-rarity={rarity}
     >
+      {dim &&
+        createPortal(
+          <div
+            className={
+              "rarity-blackout " + (result?.rarity === "MYTHIC" ? "deep" : "")
+            }
+            aria-hidden="true"
+          />,
+          document.body,
+        )}
       <div
         className="decrypt-card"
         style={
@@ -285,18 +299,6 @@ export function CardDecryption({
             </div>
           )}
       </div>
-      {result?.serial && domainReady && (
-        <span className="serial-badge">
-          #{String(result.serial).padStart(4, "0")} ·{" "}
-          {result.serial === 1
-            ? "FIRST FOUND"
-            : result.serial <= 10
-              ? "TOP 10"
-              : result.serial <= 100
-                ? "EARLY DROP"
-                : "SERIAL"}
-        </span>
-      )}
       <div className="decrypt-rewards" aria-live="polite" aria-atomic="true">
         <div
           className={"reveal-layer " + (rarityReady ? "is-revealed" : "")}
@@ -312,6 +314,22 @@ export function CardDecryption({
             </span>
           )}
         </div>
+        {result?.serial && rarityReady && (
+          <span
+            className={
+              "serial-badge " + (result.serial === 1 ? "first-found" : "")
+            }
+          >
+            #{String(result.serial).padStart(4, "0")} ·{" "}
+            {result.serial === 1
+              ? "FIRST FOUND"
+              : result.serial <= 10
+                ? "TOP 10"
+                : result.serial <= 100
+                  ? "EARLY DROP"
+                  : "SERIAL"}
+          </span>
+        )}
         <div
           className={"reveal-layer " + (valueReady ? "is-revealed" : "")}
           aria-hidden={!valueReady}
@@ -354,7 +372,9 @@ function AnimatedPrice({
     if (
       !eligible.current ||
       seen.current === result.id ||
-      result.value < 5000 ||
+      result.rarity === "COMMON" ||
+      (!["EPIC", "LEGENDARY", "MYTHIC"].includes(result.rarity) &&
+        result.value < 5000) ||
       matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       setDisplay(result.value);

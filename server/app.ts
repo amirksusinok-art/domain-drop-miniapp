@@ -543,7 +543,7 @@ export function createApp(db: Database) {
         title: z.string().min(1).max(80),
         description: z.string().max(240),
         tld: z.string().regex(/^[a-z]{2,12}$/),
-        boost: z.number().min(1).max(10),
+        boost: z.number().min(1).max(1.3),
         startsAt: z.iso.datetime(),
         endsAt: z.iso.datetime(),
       })

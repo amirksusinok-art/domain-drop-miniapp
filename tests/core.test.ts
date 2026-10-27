@@ -140,7 +140,7 @@ test("Idempotent spin survives retry; competing spins cannot debit twice; immuta
   ]);
   assert.deepEqual(spins.map((r) => r.status).sort(), [200, 429]);
   const balance = (await request(u.token, "/state")).body.profile.coins;
-  assert.equal(balance, 50000 + d.value - 100);
+  assert.equal(balance, 50000 + d.value - 250);
 });
 test("Daily rewards and rerolls are atomic and UTC reset restores availability", async () => {
   const u = await user(103);
@@ -306,13 +306,13 @@ test("Selected zone controls the drop and paid price; unknown zones and client p
   const paid = await request(u.token, "/spin", { tld: "com" });
   assert.equal(paid.status, 200);
   assert.equal(paid.body.state.pending.tld, "com");
-  assert.equal(paid.body.state.profile.coins, 47750);
+  assert.equal(paid.body.state.profile.coins, 46500);
   await ready(u.userId);
   assert.equal((await request(u.token, "/reroll", { tld: "ua" })).status, 400);
   const rerolled = await request(u.token, "/reroll", {});
   assert.equal(rerolled.status, 200);
   assert.equal(rerolled.body.state.pending.tld, "com");
-  assert.equal(rerolled.body.state.profile.coins, 47750);
+  assert.equal(rerolled.body.state.profile.coins, 46500);
 });
 test("Pity cannot be transferred from cheap zones to premium zones", async () => {
   const u = await user(111);
@@ -356,7 +356,7 @@ test("RANDOM mode, its price and reroll behavior survive persisted results", asy
   await ready(u.userId);
   const paid = await request(u.token, "/spin", { tld: "random" });
   assert.equal(paid.status, 200);
-  assert.equal(paid.body.state.profile.coins, 49500);
+  assert.equal(paid.body.state.profile.coins, 49250);
   assert.equal(paid.body.state.pending.spin_mode, "random");
   await assert.rejects(
     db.query("UPDATE domains SET spin_mode='com' WHERE id=$1", [
@@ -367,7 +367,7 @@ test("RANDOM mode, its price and reroll behavior survive persisted results", asy
   const rerolled = await request(u.token, "/reroll", {});
   assert.equal(rerolled.status, 200);
   assert.equal(rerolled.body.state.pending.spin_mode, "random");
-  assert.equal(rerolled.body.state.profile.coins, 49500);
+  assert.equal(rerolled.body.state.profile.coins, 49250);
   assert.equal(
     (
       await db.query(

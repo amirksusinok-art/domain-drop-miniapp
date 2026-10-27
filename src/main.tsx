@@ -11,6 +11,7 @@ import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/space-grotesk/latin-700.css";
 import "./styles.css";
 import "./navigation.css";
+import "./polish.css";
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

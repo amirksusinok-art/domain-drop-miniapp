@@ -114,6 +114,7 @@ export type State = {
     spinPrice: number;
     dailyReward: number;
     pityGuarantee: number;
+    pityStart: number;
     zones: {
       name: string;
       spinPrice: number;

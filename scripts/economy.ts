@@ -12,7 +12,14 @@ const rng = () => {
   return seed / 4294967296;
 };
 const n = Number(process.argv[2] ?? 100000),
-  only = process.argv.slice(3),
+  only = process.argv.slice(3).filter((v) => !v.startsWith("--event=")),
+  eventArg = process.argv
+    .find((v) => v.startsWith("--event="))
+    ?.slice(8)
+    .split(":"),
+  event = eventArg
+    ? { tld: eventArg[0], boost: Number(eventArg[1] ?? 1.3) }
+    : undefined,
   markets = zoneMarkets(defaultConfig),
   preparedRandom = randomMarket(defaultConfig);
 const report = [];
@@ -25,7 +32,7 @@ for (const zone of [...markets.values(), randomMarket(defaultConfig)]) {
   for (let i = 0; i < n; i++) {
     const d =
       zone.name === "random"
-        ? generateRandom(defaultConfig, pity, rng, undefined, preparedRandom)
+        ? generateRandom(defaultConfig, pity, rng, event, preparedRandom)
         : generateForZone(
             defaultConfig,
             zone.name,
@@ -53,7 +60,7 @@ for (const zone of [...markets.values(), randomMarket(defaultConfig)]) {
 }
 console.log(
   JSON.stringify(
-    { seed: 437122, availableZones: markets.size, report },
+    { seed: 437122, availableZones: markets.size, event, report },
     null,
     2,
   ),

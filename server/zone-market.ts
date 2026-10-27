@@ -81,7 +81,7 @@ export function randomMarket(config: Config): RandomMarket {
     ),
     scale:
       (config.spinPrice *
-        0.85 *
+        (config.targetRtp ?? 0.8) *
         (config.valueScale / defaultConfig.valueScale)) /
       (values / visits),
     entries,
@@ -99,19 +99,22 @@ export function randomChance(
   const entries = randomMarket(config).entries,
     total = entries.reduce(
       (sum, e) =>
-        sum + e.weight * (event?.tld === e.zone.name ? event.boost : 1),
+        sum +
+        e.weight *
+          (event?.tld === e.zone.name
+            ? Math.min(1.3, Math.max(1, event.boost))
+            : 1),
       0,
     );
   return entries.reduce(
     (sum, e) =>
       sum +
-      ((e.weight * (event?.tld === e.zone.name ? event.boost : 1)) / total) *
-        chanceFor(
-          e.zone,
-          config,
-          pity,
-          event?.tld === e.zone.name ? event.boost : 1,
-        ),
+      ((e.weight *
+        (event?.tld === e.zone.name
+          ? Math.min(1.3, Math.max(1, event.boost))
+          : 1)) /
+        total) *
+        chanceFor(e.zone, config, pity),
     0,
   );
 }
@@ -124,13 +127,22 @@ export function generateRandom(
 ): Drop {
   const market = prepared ?? randomMarket(config);
   const total = market.entries.reduce(
-    (sum, e) => sum + e.weight * (event?.tld === e.zone.name ? event.boost : 1),
+    (sum, e) =>
+      sum +
+      e.weight *
+        (event?.tld === e.zone.name
+          ? Math.min(1.3, Math.max(1, event.boost))
+          : 1),
     0,
   );
   let draw = rng() * total;
   let selected = market.entries.at(-1)!;
   for (const entry of market.entries) {
-    draw -= entry.weight * (event?.tld === entry.zone.name ? event.boost : 1);
+    draw -=
+      entry.weight *
+      (event?.tld === entry.zone.name
+        ? Math.min(1.3, Math.max(1, event.boost))
+        : 1);
     if (draw < 0) {
       selected = entry;
       break;
@@ -141,7 +153,7 @@ export function generateRandom(
     selected.zone.name,
     pity,
     rng,
-    event?.tld === selected.zone.name ? event.boost : 1,
+    1,
     selected.zone,
   );
   const scale = drop.breakdown.scale * market.scale,
@@ -218,7 +230,10 @@ export function zoneMarkets(config: Config) {
           Math.max(
             100,
             Math.round(
-              (config.spinPrice * tld.multiplier * tld.multiplier) / 100,
+              ((config.zonePriceBase ?? 750) *
+                tld.multiplier *
+                tld.multiplier) /
+                100,
             ) * 50,
           ),
         ),
@@ -252,7 +267,8 @@ export function zoneMarkets(config: Config) {
       survival *= 1 - chance;
     }
     zone.scale =
-      ((zone.spinPrice * 0.85) / (totalValue / totalVisits)) *
+      ((zone.spinPrice * (config.targetRtp ?? 0.8)) /
+        (totalValue / totalVisits)) *
       (config.valueScale / defaultConfig.valueScale);
     // Values and their full formula are snapshotted when generated, never repriced later.
     zone.buckets = buckets.map((bucket) =>

@@ -102,3 +102,18 @@ test("Fixed TLD stays known throughout decryption without a secret-zone phase", 
   assert.ok(frames.every((f) => f.stage !== "tld" && f.stage !== "signal"));
   assert.equal(frames.at(-1)?.stage, "ready");
 });
+
+test("Rarity follows the fully visible domain by 400ms in RANDOM and fixed TLD modes", () => {
+  for (const rarity of rarities)
+    for (const fixed of [false, true])
+      for (const fast of [false, true]) {
+        const d = drop(rarity),
+          frames = revealTimeline(d, fast, false, false, fixed);
+        const complete = frames.find(
+          (f) => f.nameLocked === d.name.length && f.tldLocked === d.tld.length,
+        )!;
+        const reveal = frames.find((f) => f.stage === "rarity")!;
+        assert.equal(reveal.at - complete.at, 400);
+        assert.ok(frames.find((f) => f.stage === "value")!.at > reveal.at);
+      }
+});

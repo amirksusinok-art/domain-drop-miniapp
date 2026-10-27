@@ -1,0 +1,210 @@
+/* Quiet controls, expressive text; dropped domains retain no separate frame. */
+.minimal-spin .selected-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #cbdcf4;
+  margin: 2px 2px 12px;
+  font-family: "Space Grotesk", monospace;
+}
+.minimal-spin .selected-zone > span {
+  font-size: 16px;
+  font-weight: 700;
+}
+.minimal-spin .selected-zone small {
+  font-size: 12px;
+  color: #91a9cb;
+}
+.minimal-spin .zone-shortcuts {
+  margin-top: 0;
+}
+.minimal-spin .zone-shortcuts > button {
+  flex: 0 0 auto;
+  min-width: 55px;
+  min-height: 44px;
+  padding: 10px 13px;
+  font-size: 12px;
+}
+.minimal-spin .zone-shortcuts > button:first-child {
+  font-size: 11px;
+}
+.all-tld {
+  padding: 12px 0;
+}
+.all-tld input {
+  width: 100%;
+}
+.minimal-spin .decrypt-name {
+  font-size: clamp(38px, 5vw, 64px);
+  letter-spacing: -1.5px;
+  line-height: 1.25;
+}
+.minimal-spin .decrypt-name .decoded-name {
+  overflow-wrap: anywhere;
+}
+.minimal-spin .decryption-stage {
+  padding: 22px 0 0;
+  min-height: 245px;
+}
+.minimal-spin .compact-luck {
+  margin: 6px 0 18px;
+}
+.minimal-spin .compact-luck.quiet {
+  opacity: 0.22;
+}
+.minimal-spin .decrypt-status {
+  font-size: 9px;
+  opacity: 0.6;
+}
+.minimal-spin .mythic-focus:before {
+  display: none;
+}
+.rarity-blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #000b;
+  pointer-events: none;
+}
+.rarity-blackout.deep {
+  background: #000f;
+}
+.minimal-spin .decryption-stage[data-rarity="COMMON"] .decoded-name {
+  text-shadow: none;
+}
+.minimal-spin .decryption-stage[data-rarity="UNCOMMON"] .decoded-name {
+  animation: uncommon-flash 0.45s ease-out;
+}
+.minimal-spin .decryption-stage[data-rarity="RARE"] .decoded-name {
+  text-shadow: 0 0 26px #578bff80;
+  animation: rare-flash 0.6s ease-out;
+}
+.minimal-spin .decryption-stage[data-rarity="EPIC"] .decoded-name {
+  text-shadow: 0 0 32px #ac8cffb0;
+  animation: epic-pulse 0.7s ease-out;
+}
+.minimal-spin .decryption-stage[data-rarity="LEGENDARY"] .decoded-name {
+  color: #ffe1a1;
+  text-shadow: 0 0 40px #efbd6490;
+  animation: epic-pulse 0.8s ease-out;
+}
+.minimal-spin .decryption-stage[data-rarity="MYTHIC"] .decoded-name {
+  color: #ffd1e4;
+  text-shadow: 0 0 42px #ff7f9da0;
+  animation: mythic-reveal 0.9s ease-out;
+}
+.decrypt-rewards .serial-badge {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+}
+.decrypt-rewards .serial-badge:has(+ *) {
+  color: #ac9bd0;
+}
+.minimal-topbar {
+  justify-content: space-between;
+}
+.minimal-topbar > .profile-chip {
+  display: flex;
+}
+.minimal-topbar .profile-chip b {
+  display: none;
+}
+.minimal-topbar .profile-chip small {
+  margin-top: 0;
+}
+.more-group .menu-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border: 1px solid #253449;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.more-group .menu-item {
+  min-height: 51px;
+  border: 0;
+  border-bottom: 1px solid #243146;
+  border-radius: 0;
+  background: #101925;
+  padding: 13px 16px;
+}
+.more-group .menu-item:last-child {
+  border-bottom: 0;
+}
+.more-group .menu-item b {
+  font-size: 13px;
+}
+.more-group .menu-item > svg {
+  width: 18px;
+  height: 18px;
+}
+@keyframes uncommon-flash {
+  from {
+    color: #90ffd1;
+  }
+  to {
+    color: inherit;
+  }
+}
+@keyframes rare-flash {
+  from {
+    filter: brightness(1.8);
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+@keyframes epic-pulse {
+  0% {
+    filter: brightness(1.6);
+    transform: scale(0.98);
+  }
+  60% {
+    transform: scale(1.035);
+  }
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+@keyframes mythic-reveal {
+  0% {
+    filter: blur(3px) brightness(2);
+    opacity: 0.2;
+  }
+  100% {
+    filter: none;
+    opacity: 1;
+  }
+}
+@media (max-width: 520px) {
+  .minimal-spin .decrypt-name {
+    font-size: clamp(38px, 10.6vw, 46px);
+  }
+  .minimal-spin .decrypt-surface {
+    padding: 22px 0;
+  }
+  .minimal-spin .decryption-stage {
+    min-height: 235px;
+  }
+  .minimal-topbar {
+    height: 64px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rarity-blackout {
+    display: none;
+  }
+  .minimal-spin .decryption-stage[data-rarity] .decoded-name {
+    animation: none !important;
+    text-shadow: none;
+  }
+}
+.decrypt-rewards .serial-badge.first-found {
+  color: #f6d18b;
+  border: 1px solid #9e784455;
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: #57402222;
+}

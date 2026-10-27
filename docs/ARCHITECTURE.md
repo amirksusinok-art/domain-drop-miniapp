@@ -6,8 +6,8 @@ Telegram WebView → React / Vite → Express TypeScript API → PostgreSQL.
 
 - Domains are virtual collectible instances. Duplicate names are allowed.
 - Immutable name, TLD, score, rarity, tags and valuation snapshot. Database trigger prevents mutation.
-- 50,000 starting coins (new users only); one first free spin; daily claim of 1,000 coins; 500 paid spin; one daily re-roll. UTC days.
-- Ordinary paid-spin target RTP is 85%, including pity, excluding rewards, first spin, re-rolls, events and auctions. Simulation reports the actual result; it is not a promise to individual players.
+- 50,000 starting coins (new users only); one first free spin; daily claim of 1,000 coins; 750 RANDOM spin (fixed TLD prices are independent); one daily re-roll. UTC days.
+- Ordinary paid-spin target RTP is 80%, including pity, excluding rewards, first spin, re-rolls, events and auctions. Simulation reports the actual result; it is not a promise to individual players.
 - One unresolved drop per player. Reload restores it. Re-roll destroys it atomically and creates a new instance.
 - Transactions and row locks serialize each player's economy. Idempotency keys bind to request method, path and payload. Ledger records every currency change.
 - Auctions escrow the full bid, refund the previous bidder and settle once. Auction lock precedes participant locks, acquired in sorted order. Scheduler uses PostgreSQL advisory transaction lock for multi-instance safety.

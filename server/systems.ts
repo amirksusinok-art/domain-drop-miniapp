@@ -16,6 +16,7 @@ export const systemSchema = z
   .object({
     quickEnabled: z.boolean(),
     quickCosts: z.array(z.number().int().min(0).max(1000000)).length(5),
+    quickRequiredSpins: z.array(z.number().int().min(0).max(1000000)).length(5),
     quickMaxLevel: z.number().int().min(0).max(5),
     quickRarities: z.array(z.enum(["COMMON", "UNCOMMON"])).min(1),
     protectedTags: z.array(z.string().max(32)).max(30),
@@ -42,7 +43,8 @@ export const systemSchema = z
 export type SystemConfig = z.infer<typeof systemSchema>;
 export const systemDefaults: SystemConfig = {
   quickEnabled: true,
-  quickCosts: [1000, 2500, 5000, 10000, 20000],
+  quickCosts: [3000, 7500, 15000, 30000, 60000],
+  quickRequiredSpins: [0, 50, 150, 300, 500],
   quickMaxLevel: 5,
   quickRarities: ["COMMON", "UNCOMMON"],
   protectedTags: [
@@ -245,6 +247,11 @@ export async function upgrade(c: DBClient, u: any) {
   const s = await systems(c);
   if (u.quick_level >= s.quickMaxLevel)
     throw new GameError(409, "Максимальный уровень");
+  if (u.spins < s.quickRequiredSpins[u.quick_level])
+    throw new GameError(
+      409,
+      `Нужно ${s.quickRequiredSpins[u.quick_level]} SPIN для следующего уровня`,
+    );
   await credit(c, u.id, -s.quickCosts[u.quick_level], "quick_upgrade");
   await c.query("UPDATE users SET quick_level=quick_level+1 WHERE id=$1", [
     u.id,
