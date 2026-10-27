@@ -9,6 +9,7 @@ export type TelegramApp = {
     notificationOccurred: (style: "success" | "error") => void;
   };
   BackButton?: {
+    isVisible?: boolean;
     show: () => void;
     hide: () => void;
     onClick: (f: () => void) => void;

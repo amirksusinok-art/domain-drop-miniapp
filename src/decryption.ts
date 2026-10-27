@@ -81,10 +81,21 @@ export function revealTimeline(
     );
   if (!fixedZone) {
     add(nameEnd + 1, "signal", domain.name.length, 0);
-    add(nameEnd + 20, "tld", domain.name.length, 0);
+    add(
+      nameEnd + (domain.rarity === "MYTHIC" ? 300 : 20),
+      "tld",
+      domain.name.length,
+      0,
+    );
     for (let i = 1; i <= domain.tld.length; i++)
       add(
-        Math.round(nameEnd + ((complete - nameEnd) * i) / domain.tld.length),
+        Math.round(
+          nameEnd +
+            (domain.rarity === "MYTHIC" ? 300 : 0) +
+            ((complete - nameEnd - (domain.rarity === "MYTHIC" ? 300 : 0)) *
+              i) /
+              domain.tld.length,
+        ),
         "tld",
         domain.name.length,
         i,
@@ -92,7 +103,12 @@ export function revealTimeline(
   }
   add(complete + 1, "multiplier", domain.name.length, domain.tld.length);
   add(complete + 100, "analyzing", domain.name.length, domain.tld.length);
-  add(complete + 400, "rarity", domain.name.length, domain.tld.length);
+  add(
+    complete + (domain.rarity === "LEGENDARY" ? 300 : 400),
+    "rarity",
+    domain.name.length,
+    domain.tld.length,
+  );
   add(target - 180, "value", domain.name.length, domain.tld.length);
   add(target - 80, "tags", domain.name.length, domain.tld.length);
   add(target, "ready", domain.name.length, domain.tld.length);

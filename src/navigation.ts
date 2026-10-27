@@ -1,5 +1,4 @@
 export type Page =
-  | "home"
   | "spin"
   | "collection"
   | "auction"

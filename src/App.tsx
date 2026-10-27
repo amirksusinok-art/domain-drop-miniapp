@@ -5,6 +5,7 @@ import {
   type Page,
 } from "./navigation";
 import { readPreference, savePreference } from "./preferences";
+import { AnimatedBalance } from "./AnimatedBalance";
 import { HomeOverview } from "./HomeOverview";
 import {
   AdminConsole,
@@ -20,7 +21,6 @@ import {
   ChevronRight,
   Coins,
   Disc3,
-  Home,
   Globe2,
   Grid2X2,
   Heart,
@@ -120,6 +120,11 @@ export function App() {
   const canBack = !!selected || navigation.stack.length > 0;
   function goBack() {
     if (rolling) return;
+    const dialog = document.querySelector("dialog[open]");
+    if (dialog) {
+      dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+      return;
+    }
     if (selected) {
       setSelected(null);
       return;
@@ -257,10 +262,10 @@ export function App() {
         <nav>
           {(
             [
-              ["home", Home, "Главная"],
               ["collection", Layers3, "Коллекция"],
-              ["spin", Disc3, "SPIN"],
               ["quests", Target, "Задания"],
+              ["spin", Disc3, "SPIN"],
+              ["records", Trophy, "Рекорды"],
               ["more", Menu, "Ещё"],
             ] as const
           ).map(([key, Icon, label]) => (
@@ -269,7 +274,7 @@ export function App() {
               className={
                 page === key ||
                 (key === "more" &&
-                  !["home", "collection", "spin", "quests"].includes(page))
+                  !["collection", "spin", "quests", "records"].includes(page))
                   ? "active"
                   : ""
               }
@@ -314,7 +319,7 @@ export function App() {
           <div className="top-actions">
             <span className="balance">
               <Coins size={19} />
-              <b>{number(p.coins)}</b>
+              <AnimatedBalance value={p.coins} />
               <small>coins</small>
             </span>
           </div>
@@ -324,16 +329,6 @@ export function App() {
             <p className="account-notice">
               Экономика аккаунта заморожена. Коллекция доступна для просмотра.
             </p>
-          )}
-          {page === "home" && (
-            <HomeOverview
-              state={state}
-              refresh={refresh}
-              busy={busy}
-              act={act}
-              onCollection={() => navigate("collection")}
-              onDomain={setSelected}
-            />
           )}
           {page === "spin" && (
             <SpinPanel
@@ -496,6 +491,15 @@ export function App() {
           {page === "more" && (
             <>
               <SectionTitle eyebrow="DOMAIN DROP" title="Ещё" />
+              <HomeOverview
+                state={state}
+                refresh={refresh}
+                busy={busy}
+                act={act}
+                onCollection={() => navigate("collection")}
+                onDomain={setSelected}
+                compact
+              />
               {[
                 {
                   title: "Игра",
@@ -504,7 +508,6 @@ export function App() {
                     { page: "auction", icon: Trophy, title: "Аукцион" },
                     { page: "quests", icon: Target, title: "Задания" },
                     { page: "events", icon: Radio, title: "События" },
-                    { page: "quick", icon: Zap, title: "Quick Sell" },
                   ],
                 },
                 {
@@ -524,6 +527,7 @@ export function App() {
                     },
                     { page: "sets", icon: Grid2X2, title: "Наборы" },
                     { page: "profile", icon: User, title: "Showcase" },
+                    { page: "quick", icon: Zap, title: "Quick Sell" },
                   ],
                 },
                 {
@@ -556,7 +560,22 @@ export function App() {
                         }
                       >
                         <item.icon />
-                        <b>{item.title}</b>
+                        <span className="menu-copy">
+                          <b>{item.title}</b>
+                          <small>
+                            {
+                              (
+                                {
+                                  scanner: "Выбери одну из трёх находок",
+                                  auction: "Торги за коллекционные домены",
+                                  quests: "Ежедневные цели и награды",
+                                  events: "Что происходит в игре",
+                                  quick: "Правила автоматической продажи",
+                                } as Record<string, string>
+                              )[item.page]
+                            }
+                          </small>
+                        </span>
                         <ChevronRight size={18} />
                       </button>
                     ))}
@@ -593,10 +612,10 @@ export function App() {
       <nav className="bottom-nav" aria-label="Основная навигация">
         {(
           [
-            ["home", Home, "Главная"],
             ["collection", Layers3, "Коллекция"],
-            ["spin", Disc3, "SPIN"],
             ["quests", Target, "Задания"],
+            ["spin", Disc3, "SPIN"],
+            ["records", Trophy, "Рекорды"],
             ["more", Menu, "Ещё"],
           ] as const
         ).map(([key, Icon, label]) => (
@@ -606,7 +625,7 @@ export function App() {
               (key === "spin" ? "nav-spin " : "") +
               (page === key ||
               (key === "more" &&
-                !["home", "collection", "spin", "quests"].includes(page))
+                !["collection", "spin", "quests", "records"].includes(page))
                 ? "active"
                 : "")
             }

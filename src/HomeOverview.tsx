@@ -11,7 +11,9 @@ export function HomeOverview({
   act,
   onCollection,
   onDomain,
+  compact = false,
 }: {
+  compact?: boolean;
   state: State;
   refresh: number;
   busy: boolean;
@@ -43,7 +45,9 @@ export function HomeOverview({
   const p = state.profile;
   return (
     <>
-      <SectionTitle eyebrow="DOMAIN DROP" title="Твой мир доменов" />
+      {!compact && (
+        <SectionTitle eyebrow="DOMAIN DROP" title="Твой мир доменов" />
+      )}
       <div className="home-grid">
         <button
           className="daily-promo"
@@ -79,29 +83,32 @@ export function HomeOverview({
           <Layers3 size={32} />
         </button>
       </div>
-      <div className="discover-heading">
-        <h2>Последние редкие находки игроков</h2>
-      </div>
-      {error ? (
-        <p role="status">{error}</p>
-      ) : feed === null ? (
-        <p className="muted" role="status">
-          Загружаем находки…
-        </p>
-      ) : feed.length ? (
-        <div className="preview-grid">
-          {feed.slice(0, 3).map((d) => (
-            <article key={d.id}>
-              <DomainCard domain={d} onClick={() => onDomain(d)} />
-              <p className="drop-finder">{displayName(d)}</p>
-            </article>
-          ))}
+      <details className="live-drops" open={!compact}>
+        <summary>Последние редкие находки игроков</summary>
+        <div className="discover-heading" hidden>
+          <h2>Последние редкие находки игроков</h2>
         </div>
-      ) : (
-        <Empty title="Редкие находки ещё впереди">
-          Здесь появятся реальные находки из глобальной ленты.
-        </Empty>
-      )}
+        {error ? (
+          <p role="status">{error}</p>
+        ) : feed === null ? (
+          <p className="muted" role="status">
+            Загружаем находки…
+          </p>
+        ) : feed.length ? (
+          <div className="preview-grid">
+            {feed.slice(0, 3).map((d) => (
+              <article key={d.id}>
+                <DomainCard domain={d} onClick={() => onDomain(d)} />
+                <p className="drop-finder">{displayName(d)}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <Empty title="Редкие находки ещё впереди">
+            Здесь появятся реальные находки из глобальной ленты.
+          </Empty>
+        )}
+      </details>
       <p className="fine-print">
         Домены — виртуальные коллекционные предметы. Их нельзя улучшать,
         регистрировать или обменивать на реальные деньги.

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, RefreshCw, Zap } from "lucide-react";
 import type { Domain, State } from "../shared/types";
+import { ZoneSheet } from "./ZoneSheet";
 import { CardDecryption } from "./CardDecryption";
 import { number } from "./components";
 import "./minimal-spin.css";
@@ -34,8 +35,8 @@ export function SpinPanel({
       return "random";
     }
   });
-  const [allZones, setAllZones] = useState(false),
-    [zoneSearch, setZoneSearch] = useState("");
+  const [allZones, setAllZones] = useState(false);
+  const shortcuts = useRef<HTMLDivElement>(null);
   const p = state.profile,
     locked = busy || rolling || state.account.frozen,
     zones = state.config.zones;
@@ -46,6 +47,15 @@ export function SpinPanel({
   useEffect(() => {
     if (pendingMode) setChosen(pendingMode);
   }, [pendingMode]);
+  useEffect(() => {
+    shortcuts.current?.querySelector("[aria-pressed=true]")?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }, [selected?.name]);
   function choose(name: string) {
     setChosen(name);
     setAllZones(false);
@@ -79,8 +89,20 @@ export function SpinPanel({
           </span>
           <small>{number(selected?.spinPrice ?? 0)} coins</small>
         </div>
-        <div className="zone-shortcuts">
-          {["random", "xyz", "uk", "gg", "io", "ai", "com"]
+        <div className="zone-shortcuts" ref={shortcuts}>
+          {[
+            ...new Set([
+              "random",
+              "xyz",
+              "ua",
+              "uk",
+              "gg",
+              "io",
+              "ai",
+              "com",
+              selected?.name ?? "random",
+            ]),
+          ]
             .map((name) => zones.find((z) => z.name === name))
             .filter((z) => !!z)
             .map((z) => (
@@ -93,6 +115,9 @@ export function SpinPanel({
                 onClick={() => choose(z.name)}
               >
                 {z.name === "random" ? "RANDOM" : "." + z.name}
+                {selected?.name === z.name && (
+                  <small>{number(z.spinPrice)}</small>
+                )}
               </button>
             ))}
           <button
@@ -105,34 +130,12 @@ export function SpinPanel({
           </button>
         </div>
         {allZones && (
-          <div className="all-tld">
-            <input
-              aria-label="Поиск доменной зоны"
-              placeholder="Найти зону"
-              value={zoneSearch}
-              onChange={(e) =>
-                setZoneSearch(e.target.value.toLowerCase().replaceAll(".", ""))
-              }
-            />
-            <div
-              className="zone-chips"
-              role="group"
-              aria-label="Все доменные зоны"
-            >
-              {zones
-                .filter((z) => z.name.includes(zoneSearch))
-                .map((z) => (
-                  <button
-                    type="button"
-                    key={z.name}
-                    aria-pressed={selected?.name === z.name}
-                    onClick={() => choose(z.name)}
-                  >
-                    {z.name === "random" ? "RANDOM" : "." + z.name}
-                  </button>
-                ))}
-            </div>
-          </div>
+          <ZoneSheet
+            zones={zones}
+            selected={selected?.name ?? "random"}
+            onChoose={choose}
+            onClose={() => setAllZones(false)}
+          />
         )}
       </div>
       <CardDecryption

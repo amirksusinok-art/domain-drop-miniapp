@@ -201,10 +201,12 @@ export function CardDecryption({
           initializing: "INITIALIZING…",
           scramble: "RESOLVING DOMAIN…",
           name: "LOCKING CHARACTERS…",
-          signal: "NAME RESOLVED",
+          signal:
+            result?.rarity === "MYTHIC" ? "UNKNOWN SIGNAL" : "NAME RESOLVED",
           tld: "RESOLVING TLD…",
           multiplier: "TLD VERIFIED",
-          analyzing: "ANALYZING…",
+          analyzing:
+            result?.rarity === "MYTHIC" ? "UNKNOWN SIGNAL" : "ANALYZING…",
           rarity: "RARITY DETECTED",
           value: "VALUE CONFIRMED",
           tags: "SIGNAL DECODED",
@@ -219,13 +221,17 @@ export function CardDecryption({
   const dim =
     animating &&
     ["LEGENDARY", "MYTHIC"].includes(result?.rarity ?? "") &&
-    stage === "analyzing";
+    (stage === "analyzing" ||
+      (result?.rarity === "MYTHIC" && ["signal", "tld"].includes(stage)));
   return (
     <div
       className={
         "decryption-stage " +
         (animating ? "decrypting " : "") +
-        (dim ? "mythic-focus" : "")
+        (dim ? "mythic-focus " : "") +
+        (rarityReady && result?.discovery?.globalRecord
+          ? "global-record-reveal"
+          : "")
       }
       data-stage={waiting ? "waiting" : !result && !animating ? "idle" : stage}
       data-rarity={rarity}
@@ -266,6 +272,12 @@ export function CardDecryption({
         >
           <span
             className={"decrypt-name " + (animating ? "has-pulse" : "")}
+            style={
+              {
+                "--domain-length": name.length + zone.length + 1,
+                "--domain-size": `${Math.min(46, Math.max(20, 460 / (name.length + zone.length + 1)))}px`,
+              } as CSSProperties
+            }
             key={pulse}
             aria-hidden="true"
           >
@@ -276,11 +288,6 @@ export function CardDecryption({
               .{zone}
             </span>
           </span>
-          {animating &&
-            stage === "signal" &&
-            ["LEGENDARY", "MYTHIC"].includes(result!.rarity) && (
-              <span className="signal-message">{status}</span>
-            )}
         </button>
         <span className="sr-only">
           {domainReady && result
@@ -314,36 +321,35 @@ export function CardDecryption({
             </span>
           )}
         </div>
-        {result?.serial && rarityReady && (
-          <span
-            className={
-              "serial-badge " + (result.serial === 1 ? "first-found" : "")
-            }
-          >
-            #{String(result.serial).padStart(4, "0")} ·{" "}
-            {result.serial === 1
-              ? "FIRST FOUND"
-              : result.serial <= 10
-                ? "TOP 10"
-                : result.serial <= 100
-                  ? "EARLY DROP"
-                  : "SERIAL"}
-          </span>
-        )}
+        {result?.serial &&
+          rarityReady &&
+          (result.rarity !== "MYTHIC" || reached(stage, "tags")) && (
+            <span
+              style={result.rarity === "MYTHIC" ? { order: 3 } : undefined}
+              className={
+                "serial-badge " + (result.serial === 1 ? "first-found" : "")
+              }
+            >
+              #{String(result.serial).padStart(4, "0")} ·{" "}
+              {result.serial === 1
+                ? "FIRST FOUND"
+                : result.serial <= 10
+                  ? "TOP 10"
+                  : result.serial <= 100
+                    ? "EARLY DROP"
+                    : "SERIAL"}
+            </span>
+          )}
         <div
           className={"reveal-layer " + (valueReady ? "is-revealed" : "")}
           aria-hidden={!valueReady}
         >
           {valueReady && (
             <>
-              <button
-                className="price-link"
-                onClick={onDetails}
-                disabled={animating}
-              >
+              <span className="price-link">
                 <AnimatedPrice result={result!} enabled={animating} />{" "}
                 <span>COINS</span>
-              </button>
+              </span>
               {result!.value >= highValueThreshold && (
                 <span className="high-value">
                   <Zap size={11} /> HIGH VALUE
@@ -352,6 +358,13 @@ export function CardDecryption({
             </>
           )}
         </div>
+        {result && reached(stage, "tags") && (
+          <div className="revealed-tags">
+            {result.tags.map((tag) => (
+              <span key={tag}>{tag.replaceAll("_", " ")}</span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

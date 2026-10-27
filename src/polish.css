@@ -208,3 +208,323 @@
   border-radius: 7px;
   background: #57402222;
 }
+/* Visual polish: quiet surroundings, one central reward. */
+:root {
+  --game-bottom-inset: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--tg-safe-area-inset-bottom, 0px),
+    var(--tg-content-safe-area-inset-bottom, 0px)
+  );
+}
+.minimal-spin.generator {
+  max-width: 820px;
+  margin-inline: auto;
+  box-shadow: none;
+  background: radial-gradient(ellipse at 50% 36%, #17223a24, transparent 65%);
+}
+.minimal-spin .decryption-stage {
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+}
+.minimal-spin .decrypt-name {
+  font-size: var(--domain-size, 46px);
+  white-space: nowrap;
+  display: inline-flex;
+  max-width: 100%;
+  letter-spacing: -1.2px;
+}
+.minimal-spin .decrypt-name .decoded-name {
+  overflow-wrap: normal;
+}
+.minimal-spin .zone-shortcuts {
+  align-items: stretch;
+  padding-block: 3px 8px;
+  scroll-padding-inline: 30%;
+}
+.minimal-spin .zone-shortcuts > button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  height: 58px;
+  border: 1px solid #253349;
+  box-shadow: none;
+}
+.minimal-spin .zone-shortcuts > button.active {
+  border-color: var(--accent);
+  background: #1b2b45;
+  box-shadow: 0 0 12px #578bff18;
+  color: #dceaff;
+}
+.minimal-spin .zone-shortcuts small {
+  font-size: 9px;
+  color: #9db8df;
+}
+.zone-sheet {
+  width: min(600px, calc(100% - 24px));
+  max-height: min(80dvh, 760px);
+  padding: 20px;
+  color: #dce7f6;
+  background: #101824;
+  border: 1px solid #2d3c52;
+  border-radius: 22px;
+  overflow: hidden;
+}
+.zone-sheet::backdrop {
+  background: #03070dc9;
+  backdrop-filter: blur(5px);
+}
+.zone-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.zone-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.zone-sheet h2 {
+  font:
+    700 17px "Space Grotesk",
+    sans-serif;
+  margin: 0;
+  letter-spacing: 1px;
+}
+.zone-sheet header button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: #1a2638;
+  color: #b8c9df;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.zone-sheet input {
+  width: 100%;
+  flex-shrink: 0;
+}
+.zone-sheet-list {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: var(--game-bottom-inset);
+}
+.zone-sheet h3 {
+  font-size: 10px;
+  color: #8096b5;
+  letter-spacing: 1.5px;
+  margin: 22px 0 12px;
+}
+.zone-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.zone-sheet-grid button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 13px 10px;
+  min-height: 66px;
+  border: 1px solid #26354a;
+  background: #141f2e;
+  color: #bed0e7;
+  border-radius: 11px;
+}
+.zone-sheet-grid button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #213554;
+}
+.zone-sheet-grid small {
+  font-size: 10px;
+  color: #8fa5c2;
+  white-space: nowrap;
+}
+.animated-balance {
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+.balance .balance-delta {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  color: #9aaac0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.balance .balance-delta.positive {
+  color: #78d5ad;
+}
+.balance {
+  box-shadow: none;
+}
+.menu-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  flex: 1;
+}
+.menu-copy small {
+  color: #8296b1;
+  font-size: 10px;
+  font-weight: 400;
+}
+.menu-copy small:empty {
+  display: none;
+}
+.more-group .menu-item > svg:last-child {
+  display: block;
+  width: 16px;
+  opacity: 0.45;
+}
+.live-drops {
+  margin: 18px 0;
+}
+.live-drops summary {
+  color: #9db4d1;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 12px 0;
+}
+.live-drops .preview-grid {
+  margin-top: 12px;
+}
+.more-group {
+  margin: 22px 0;
+}
+.more-group h2 {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.more-group .menu-grid {
+  border-color: #233146;
+}
+.minimal-spin .spin-button {
+  box-shadow: 0 4px 20px #5485ff18;
+}
+.minimal-spin .spin-button:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(1.15);
+}
+.minimal-spin .serial-badge.first-found {
+  box-shadow: 0 0 18px #f6d18b26;
+}
+.minimal-spin .global-record-reveal .decoded-name {
+  text-shadow:
+    0 0 24px var(--drop-color),
+    0 0 58px var(--drop-color);
+}
+@media (min-width: 801px) {
+  .minimal-spin .decrypt-name {
+    font-size: min(64px, calc(var(--domain-size, 46px) * 1.35));
+  }
+}
+@media (max-width: 800px) {
+  .app {
+    padding-bottom: calc(100px + var(--game-bottom-inset));
+  }
+  .bottom-nav {
+    padding-bottom: calc(8px + var(--game-bottom-inset));
+  }
+  .zone-sheet {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: 85dvh;
+    border-radius: 22px 22px 0 0;
+    padding: 16px;
+  }
+  .minimal-spin .decrypt-name {
+    font-size: min(var(--domain-size, 46px), 11.8vw);
+  }
+  .minimal-spin .decryption-stage {
+    padding-inline: 0;
+  }
+  .zone-picker {
+    min-width: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-button:active {
+    transform: none !important;
+  }
+  .global-record-reveal .decoded-name {
+    text-shadow: none !important;
+  }
+}
+.minimal-spin .decrypt-surface {
+  container-type: inline-size;
+}
+.minimal-spin .decrypt-name {
+  font-size: min(
+    var(--domain-size, 46px),
+    calc(180cqw / var(--domain-length, 7))
+  );
+}
+.revealed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.revealed-tags span {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #91a5c0;
+  padding: 3px 6px;
+  background: #192335;
+  border-radius: 4px;
+}
+@media (min-width: 801px) {
+  .minimal-spin .decrypt-name {
+    font-size: min(
+      64px,
+      calc(var(--domain-size, 46px) * 1.35),
+      calc(180cqw / var(--domain-length, 7))
+    );
+  }
+}
+@media (max-width: 800px) {
+  .minimal-spin .decrypt-name {
+    font-size: min(
+      var(--domain-size, 46px),
+      11.8vw,
+      calc(180cqw / var(--domain-length, 7))
+    );
+  }
+}
+.minimal-spin.generator {
+  border-color: #26364c40;
+}
+@media (max-width: 800px) {
+  .minimal-spin.generator {
+    border: 0;
+    padding: 0;
+    background: none;
+  }
+}
+.minimal-spin.generator {
+  isolation: auto;
+}
+.minimal-spin .mythic-focus {
+  z-index: 41;
+}
+.minimal-spin span.price-link {
+  cursor: default;
+}
+.revealed-tags {
+  order: 4;
+}
+.minimal-spin .decrypt-rewards .price-link > span:first-child {
+  font-size: inherit;
+  color: inherit;
+  letter-spacing: -0.5px;
+}
