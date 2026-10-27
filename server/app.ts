@@ -1,3 +1,5 @@
+import { registerSystems } from "./system-routes.js";
+import * as systems from "./systems.js";
 import express, {
   type Request,
   type Response,
@@ -135,7 +137,7 @@ export function createApp(db: Database) {
           ? process.env.SUPPORT_USERNAME
             ? `Поддержка: @${process.env.SUPPORT_USERNAME}`
             : "Поддержка: обратитесь к владельцу бота."
-          : "DOMAIN DROP\nВыбивай редкие виртуальные домены и собирай свою коллекцию.\nСтартовый баланс — 10 000 coins.";
+          : `DOMAIN DROP\nВыбивай редкие виртуальные домены и собирай свою коллекцию.\nСтартовый баланс — ${(await game.configFor(c)).startingBalance} coins.`;
         const response = await fetch(
           `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
           {
@@ -181,6 +183,56 @@ export function createApp(db: Database) {
     if (!session)
       throw new GameError(401, "Сессия истекла. Откройте игру заново");
     res.locals.userId = session.user_id;
+    next();
+  });
+  const traffic = new Map<
+    string,
+    {
+      start: number;
+      count: number;
+      promos: number;
+      repeats: number;
+      keys: Set<string>;
+    }
+  >();
+  app.use("/api", async (req, res, next) => {
+    const id = res.locals.userId,
+      now = Date.now();
+    let t = traffic.get(id);
+    if (!t || now - t.start > 60000) {
+      t = { start: now, count: 0, promos: 0, repeats: 0, keys: new Set() };
+      traffic.set(id, t);
+    }
+    t.count++;
+    if (req.path === "/promo/redeem") t.promos++;
+    const key = req.get("idempotency-key");
+    if (key && t.keys.has(key)) t.repeats++;
+    if (key) t.keys.add(key);
+    const cfg = await systems.systems(db);
+    if (t.count === cfg.security.requestsPerMinute)
+      await systems.flag(db, id, "api_rate", { count: t.count });
+    if (t.promos === cfg.security.promoAttempts)
+      await systems.flag(db, id, "promo_attempts", { count: t.promos });
+    if (t.repeats === 10)
+      await systems.flag(db, id, "repeated_request_ids", { count: t.repeats });
+    if (traffic.size > 10000)
+      for (const [k, v] of traffic)
+        if (now - v.start > 60000) traffic.delete(k);
+    const u = (
+      await db.query(
+        "SELECT telegram_id,permanent_ban,banned_until FROM users WHERE id=$1",
+        [id],
+      )
+    ).rows[0];
+    if (
+      !req.path.startsWith("/admin") &&
+      (u.permanent_ban ||
+        (u.banned_until && new Date(u.banned_until).getTime() > now))
+    )
+      throw new GameError(403, "Аккаунт заблокирован. Обратитесь в поддержку");
+    const cfgGame = await game.configFor(db);
+    if (cfgGame.maintenance && !game.isAdmin(u.telegram_id))
+      throw new GameError(503, "DOMAIN DROP временно обновляется");
     next();
   });
   app.use(
@@ -351,6 +403,7 @@ export function createApp(db: Database) {
         ),
       );
     });
+  registerSystems(app, db, mutation);
   const empty = z.object({}).strict();
   const idBody = z.object({ id: z.uuid() }).strict();
   mutation(
@@ -394,7 +447,10 @@ export function createApp(db: Database) {
     z.object({ theme: z.string().max(32) }).strict(),
     async (c, u, _config, b) => {
       const theme = game.themes.find((t) => t.id === b.theme);
-      if (!theme || theme.level > levelFor(u.xp))
+      if (
+        !theme ||
+        (theme.level > levelFor(u.xp) && !u.cosmetics.includes(theme.id))
+      )
         throw new GameError(409, "Эта тема пока закрыта");
       await c.query("UPDATE users SET theme=$2 WHERE id=$1", [u.id, theme.id]);
       return { theme: theme.id };
@@ -421,7 +477,8 @@ export function createApp(db: Database) {
       await db.transaction(async (c) => {
         await admin(c, res.locals.userId);
         return {
-          config: await game.configFor(c),
+          config: (await c.query("SELECT config FROM settings WHERE id=1"))
+            .rows[0].config,
           audit: (
             await c.query(
               "SELECT action,detail,created_at FROM admin_audit ORDER BY created_at DESC LIMIT 30",
@@ -436,23 +493,53 @@ export function createApp(db: Database) {
       }),
     ),
   );
-  mutation("/admin/config", configSchema, async (c, u, _config, b) => {
-    await admin(c, u.id);
-    validateConfig(b);
-    await c.query(
-      "UPDATE settings SET config=$1,version=version+1 WHERE id=1",
-      [JSON.stringify(b)],
-    );
-    await c.query(
-      "INSERT INTO admin_audit(id,user_id,action,detail) VALUES($1,$2,$3,$4)",
-      [randomUUID(), u.id, "config", JSON.stringify(b)],
-    );
-    return { saved: true };
-  });
+  mutation(
+    "/admin/config",
+    z
+      .object({
+        config: configSchema,
+        reason: z.string().trim().min(3).max(300),
+      })
+      .strict(),
+    async (c, u, _config, input) => {
+      const b = input.config;
+      await admin(c, u.id);
+      try {
+        validateConfig({
+          ...b,
+          tlds: b.tlds.filter((t: any) => t.enabled !== false),
+        });
+      } catch {
+        throw new GameError(
+          400,
+          "Активные TLD должны поддерживать все редкости",
+        );
+      }
+      if (b.tlds.filter((t: any) => t.enabled !== false).length < 6)
+        throw new GameError(400, "Нужно минимум 6 активных TLD");
+      const old = (await c.query("SELECT config FROM settings WHERE id=1"))
+        .rows[0].config;
+      await c.query(
+        "UPDATE settings SET config=$1,version=version+1 WHERE id=1",
+        [JSON.stringify(b)],
+      );
+      await c.query(
+        "INSERT INTO admin_audit(id,user_id,action,detail) VALUES($1,$2,$3,$4)",
+        [
+          randomUUID(),
+          u.id,
+          "config",
+          JSON.stringify({ old, new: b, reason: input.reason }),
+        ],
+      );
+      return { saved: true };
+    },
+  );
   mutation(
     "/admin/event",
     z
       .object({
+        reason: z.string().trim().min(3).max(300),
         title: z.string().min(1).max(80),
         description: z.string().max(240),
         tld: z.string().regex(/^[a-z]{2,12}$/),
@@ -486,6 +573,7 @@ export function createApp(db: Database) {
       .object({
         name: z.string().regex(/^[a-z0-9]{1,24}$/),
         tld: z.string().regex(/^[a-z]{2,12}$/),
+        reason: z.string().trim().min(3).max(300),
         startPrice: z.number().int().min(100).max(100000000),
         hours: z.number().int().min(1).max(168),
       })

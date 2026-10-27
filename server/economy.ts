@@ -6,6 +6,7 @@ const tldSchema = z.object({
     .string()
     .regex(/^[a-z]{2,12}$/)
     .refine((name) => name !== "random", "RANDOM is a spin mode, not a TLD"),
+  enabled: z.boolean().optional(),
   weight: z.number().min(0.01).max(1000),
   multiplier: z.number().min(0.1).max(10),
   score: z.number().int().min(0).max(30),
@@ -18,6 +19,9 @@ export const configSchema = z
     startingBalance: z.number().int().min(0).max(1000000),
     dailyReward: z.number().int().min(0).max(10000),
     pityGuarantee: z.number().int().min(10).max(100),
+    pityBaseBoost: z.number().min(0).max(0.5).optional(),
+    pityStep: z.number().min(0).max(0.1).optional(),
+    pityMaxBoost: z.number().min(0).max(0.8).optional(),
     pityStart: z.number().int().min(0).max(90),
     dailyRerolls: z.number().int().min(0).max(1),
     valueScale: z.number().min(0.01).max(10),
@@ -41,7 +45,7 @@ export const configSchema = z
 export type Config = z.infer<typeof configSchema>;
 export const defaultConfig: Config = {
   spinPrice: 500,
-  startingBalance: 10000,
+  startingBalance: 50000,
   dailyReward: 1000,
   pityGuarantee: 30,
   pityStart: 10,
@@ -408,7 +412,11 @@ export function generate(
     weights[0] = 0;
     weights[1] = 0;
   } else if (pity >= config.pityStart) {
-    const boost = Math.min(0.08, 0.01 + (pity - config.pityStart) * 0.004);
+    const boost = Math.min(
+      config.pityMaxBoost ?? 0.08,
+      (config.pityBaseBoost ?? 0.01) +
+        (pity - config.pityStart) * (config.pityStep ?? 0.004),
+    );
     weights[2] += sum * boost;
   }
   const available = rarities

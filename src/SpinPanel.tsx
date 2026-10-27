@@ -35,7 +35,7 @@ export function SpinPanel({
     }
   });
   const p = state.profile,
-    locked = busy || rolling,
+    locked = busy || rolling || state.account.frozen,
     zones = state.config.zones;
   const pendingMode = state.pending?.spin_mode ?? state.pending?.tld;
   const selected =
@@ -62,6 +62,11 @@ export function SpinPanel({
       }
       aria-label="Генератор доменов"
     >
+      {state.account.frozen && (
+        <p className="account-notice">
+          Экономика аккаунта заморожена. Коллекция доступна для просмотра.
+        </p>
+      )}
       <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
         <label htmlFor="spin-zone">
           ЗОНА{" "}
@@ -146,47 +151,85 @@ export function SpinPanel({
           value={selected?.pity ?? 0}
         />
       </div>
+      {state.pending && !rolling && (
+        <>
+          {" "}
+          <div className="drop-honors">
+            {state.pending.discovery?.globalRecord && (
+              <strong>NEW GLOBAL RECORD · #1 ALL TIME</strong>
+            )}
+            {state.pending.discovery?.personalBest && (
+              <span>
+                NEW PERSONAL BEST ·{" "}
+                {number(state.pending.discovery.oldPersonal ?? 0)} →{" "}
+                {number(state.pending.value)}
+              </span>
+            )}
+            {state.pending.discovery?.firstFound && (
+              <strong>
+                FIRST FOUND · Ты первым обнаружил {state.pending.name}.
+                {state.pending.tld} с запуска Serial
+              </strong>
+            )}
+          </div>
+        </>
+      )}
       {state.pending && !rolling ? (
-        <div className="decrypt-result-actions">
-          <div className="result-actions">
+        state.pending.quick_sold ? (
+          <div className="quick-sold">
+            <h3>QUICK SOLD</h3>
+            <p>+{number(state.pending.value)} coins</p>
             <button
               className="primary"
-              disabled={locked}
-              onClick={() =>
-                act("/domain", { id: state.pending!.id, action: "keep" })
-              }
+              disabled={busy}
+              onClick={() => act("/drop/ack", { id: state.pending!.id })}
             >
-              <Check size={18} /> Оставить
-            </button>
-            <button
-              className="secondary"
-              disabled={locked}
-              onClick={() =>
-                act("/domain", { id: state.pending!.id, action: "sell" })
-              }
-            >
-              Продать · {number(state.pending.value)}
+              Продолжить
             </button>
           </div>
-          <button
-            className="reroll"
-            disabled={locked || (!p.reroll_available && !p.reroll_tokens)}
-            onClick={() => act("/reroll", {}, true)}
-          >
-            <RefreshCw size={15} />
-            {p.reroll_available
-              ? "FREE RE-ROLL 1/1"
-              : p.reroll_tokens
-                ? "RE-ROLL TOKEN · " + p.reroll_tokens
-                : "FREE RE-ROLL 0/1"}
-          </button>
-        </div>
+        ) : (
+          <div className="decrypt-result-actions">
+            <div className="result-actions">
+              <button
+                className="primary"
+                disabled={locked}
+                onClick={() =>
+                  act("/domain", { id: state.pending!.id, action: "keep" })
+                }
+              >
+                <Check size={18} /> Оставить
+              </button>
+              <button
+                className="secondary"
+                disabled={locked}
+                onClick={() =>
+                  act("/domain", { id: state.pending!.id, action: "sell" })
+                }
+              >
+                Продать · {number(state.pending.value)}
+              </button>
+            </div>
+            <button
+              className="reroll"
+              disabled={locked || (!p.reroll_available && !p.reroll_tokens)}
+              onClick={() => act("/reroll", {}, true)}
+            >
+              <RefreshCw size={15} />
+              {p.reroll_available
+                ? "FREE RE-ROLL 1/1"
+                : p.reroll_tokens
+                  ? "RE-ROLL TOKEN · " + p.reroll_tokens
+                  : "FREE RE-ROLL 0/1"}
+            </button>
+          </div>
+        )
       ) : (
         <div className="spin-controls decrypt-controls">
           <button
             className="primary spin-button"
             disabled={
               locked ||
+              !state.systems.flags.spin ||
               !!state.scanner ||
               !selected ||
               (!p.free_spin && p.coins < selected.spinPrice)

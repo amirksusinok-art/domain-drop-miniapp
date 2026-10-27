@@ -1,3 +1,4 @@
+import { ShareCard } from "./ShareCard";
 import {
   useCallback,
   useEffect,
@@ -284,6 +285,7 @@ export function DomainModal({
       <p className="muted">
         Имя, зона, редкость и цена зафиксированы при выпадении.
       </p>
+      <ShareCard domain={d} />
       {own && d.status === "kept" && (
         <>
           <div className="modal-actions">
@@ -668,7 +670,10 @@ export function Themes({
           <button
             className="theme-card"
             key={t.id}
-            disabled={busy || state.profile.level < t.level}
+            disabled={
+              busy ||
+              (state.profile.level < t.level && !state.cosmetics.includes(t.id))
+            }
             onClick={() => act("/theme", { theme: t.id })}
           >
             <div className="theme-preview" style={{ color: t.color }}>
@@ -682,7 +687,8 @@ export function Themes({
               <span>
                 {state.profile.theme === t.id
                   ? "Выбрана"
-                  : state.profile.level < t.level
+                  : state.profile.level < t.level &&
+                      !state.cosmetics.includes(t.id)
                     ? `С уровня ${t.level}`
                     : "Применить"}
               </span>
@@ -770,6 +776,7 @@ export function Admin({
   act: Action;
 }) {
   const { data, error } = useLoad<any>("/admin", refresh);
+  const [adminReason, setAdminReason] = useState("");
   const [config, setConfig] = useState(""),
     [validation, setValidation] = useState(""),
     [title, setTitle] = useState("AI WEEK"),
@@ -785,7 +792,7 @@ export function Admin({
     try {
       const parsed = JSON.parse(config);
       setValidation("");
-      await act("/admin/config", parsed);
+      await act("/admin/config", { config: parsed, reason: adminReason });
     } catch {
       setValidation("Некорректный JSON");
     }
@@ -794,6 +801,13 @@ export function Admin({
     <>
       <SectionTitle eyebrow="ДОСТУП ВЛАДЕЛЬЦА" title="Панель управления" />
       <LoadError error={error} />
+      <label>
+        Причина изменения
+        <input
+          value={adminReason}
+          onChange={(e) => setAdminReason(e.target.value)}
+        />
+      </label>
       <div className="panel">
         <h3>Экономика и TLD</h3>
         <p className="muted">
@@ -841,6 +855,7 @@ export function Admin({
           disabled={busy}
           onClick={() =>
             act("/admin/event", {
+              reason: adminReason,
               title,
               tld,
               boost,
@@ -885,6 +900,7 @@ export function Admin({
           disabled={busy}
           onClick={() =>
             act("/admin/auction", {
+              reason: adminReason,
               name: auctionName,
               tld: auctionTld,
               startPrice: auctionPrice,

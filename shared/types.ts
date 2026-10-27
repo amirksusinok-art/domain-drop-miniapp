@@ -23,6 +23,15 @@ export type Domain = {
     scale: number;
   };
   status: "pending" | "kept" | "sold" | "destroyed";
+  serial?: number | null;
+  quick_sold?: boolean;
+  discovery?: {
+    globalRecord?: boolean;
+    personalBest?: boolean;
+    oldPersonal?: number;
+    firstFound?: boolean;
+    event?: boolean;
+  };
   spin_mode?: string | null;
   favorite: boolean;
   vaulted: boolean;
@@ -84,6 +93,21 @@ export type Event = {
   boost: number;
 };
 export type State = {
+  systems: import("../server/systems").SystemConfig;
+  account: { frozen: boolean; banned: boolean; maintenance: boolean };
+  welcome: number | null;
+  quickSell: {
+    level: number;
+    rules: {
+      enabled: boolean;
+      rarities: ("COMMON" | "UNCOMMON")[];
+      below: number | null;
+      tlds: string[];
+      keepTags: ("SHORT" | "TRIPLE" | "PERFECT MATCH")[];
+      favoriteTld: string | null;
+    };
+  };
+  cosmetics: string[];
   profile: Profile;
   pending: Domain | null;
   config: {

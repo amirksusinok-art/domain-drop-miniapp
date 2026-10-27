@@ -285,6 +285,18 @@ export function CardDecryption({
             </div>
           )}
       </div>
+      {result?.serial && domainReady && (
+        <span className="serial-badge">
+          #{String(result.serial).padStart(4, "0")} ·{" "}
+          {result.serial === 1
+            ? "FIRST FOUND"
+            : result.serial <= 10
+              ? "TOP 10"
+              : result.serial <= 100
+                ? "EARLY DROP"
+                : "SERIAL"}
+        </span>
+      )}
       <div className="decrypt-rewards" aria-live="polite" aria-atomic="true">
         <div
           className={"reveal-layer " + (rarityReady ? "is-revealed" : "")}

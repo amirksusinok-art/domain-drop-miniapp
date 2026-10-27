@@ -62,7 +62,7 @@ export async function login(db: Database, user: z.infer<typeof telegramUser>) {
     ).rows[0].config;
     const id = randomUUID();
     const inserted = await c.query(
-      "INSERT INTO users(id,telegram_id,username,first_name,coins) VALUES($1,$2,$3,$4,$5) ON CONFLICT(telegram_id) DO NOTHING RETURNING id",
+      "INSERT INTO users(id,telegram_id,username,first_name,coins,welcome_ack,welcome_amount) VALUES($1,$2,$3,$4,$5::bigint,false,$5::bigint) ON CONFLICT(telegram_id) DO NOTHING RETURNING id",
       [
         id,
         String(user.id),
@@ -74,11 +74,11 @@ export async function login(db: Database, user: z.infer<typeof telegramUser>) {
     if (inserted.rowCount)
       await c.query(
         "INSERT INTO transactions(id,user_id,amount,balance_after,reason) VALUES($1,$2,$3,$3,$4)",
-        [randomUUID(), id, config.startingBalance, "welcome"],
+        [randomUUID(), id, config.startingBalance, "starting_balance"],
       );
     const actual = (
       await c.query(
-        "UPDATE users SET username=$2,first_name=$3 WHERE telegram_id=$1 RETURNING id",
+        "UPDATE users SET username=$2,first_name=$3,last_seen_at=now() WHERE telegram_id=$1 RETURNING id",
         [String(user.id), user.username ?? "", user.first_name],
       )
     ).rows[0].id;

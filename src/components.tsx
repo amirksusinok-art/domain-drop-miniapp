@@ -44,6 +44,18 @@ export function DomainCard({
         {domain.name}
         <span>.{domain.tld}</span>
       </strong>
+      {domain.serial && (
+        <span className="serial-badge">
+          #{String(domain.serial).padStart(4, "0")} ·{" "}
+          {domain.serial === 1
+            ? "FIRST FOUND"
+            : domain.serial <= 10
+              ? "TOP 10"
+              : domain.serial <= 100
+                ? "EARLY DROP"
+                : "SERIAL"}
+        </span>
+      )}
       <div className="card-bottom">
         <span>
           {domain.value !== undefined

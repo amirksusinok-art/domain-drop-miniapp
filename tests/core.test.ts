@@ -95,7 +95,7 @@ test("Concurrent login gives one welcome balance, and client economy fields are 
   const results = await Promise.all([user(101), user(101)]);
   assert.equal(results[0].userId, results[1].userId);
   const ledger = await db.query(
-    "SELECT * FROM transactions WHERE user_id=$1 AND reason='welcome'",
+    "SELECT * FROM transactions WHERE user_id=$1 AND reason='starting_balance'",
     [results[0].userId],
   );
   assert.equal(ledger.rows.length, 1);
@@ -119,7 +119,7 @@ test("Idempotent spin survives retry; competing spins cannot debit twice; immuta
     responses[1].body.state.pending.id,
   );
   const d = responses[0].body.state.pending;
-  assert.equal(responses[0].body.state.profile.coins, 10000);
+  assert.equal(responses[0].body.state.profile.coins, 50000);
   assert.equal((await request(u.token, "/daily", {}, key)).status, 409);
   await assert.rejects(
     db.query("UPDATE domains SET value=value+1 WHERE id=$1", [d.id]),
@@ -132,7 +132,7 @@ test("Idempotent spin survives retry; competing spins cannot debit twice; immuta
   ]);
   assert.deepEqual(sales.map((r) => r.status).sort(), [200, 409]);
   const s = (await request(u.token, "/state")).body;
-  assert.equal(s.profile.coins, 10000 + d.value);
+  assert.equal(s.profile.coins, 50000 + d.value);
   await ready(u.userId);
   const spins = await Promise.all([
     request(u.token, "/spin", { tld: "xyz" }),
@@ -140,7 +140,7 @@ test("Idempotent spin survives retry; competing spins cannot debit twice; immuta
   ]);
   assert.deepEqual(spins.map((r) => r.status).sort(), [200, 429]);
   const balance = (await request(u.token, "/state")).body.profile.coins;
-  assert.equal(balance, 10000 + d.value - 100);
+  assert.equal(balance, 50000 + d.value - 100);
 });
 test("Daily rewards and rerolls are atomic and UTC reset restores availability", async () => {
   const u = await user(103);
@@ -155,7 +155,7 @@ test("Daily rewards and rerolls are atomic and UTC reset restores availability",
   const reroll = await request(u.token, "/reroll", {});
   assert.equal(reroll.status, 200);
   assert.notEqual(old, reroll.body.state.pending.id);
-  assert.equal(reroll.body.state.profile.coins, 11000);
+  assert.equal(reroll.body.state.profile.coins, 51000);
   assert.equal(
     (await db.query("SELECT status FROM domains WHERE id=$1", [old])).rows[0]
       .status,
@@ -239,10 +239,10 @@ test("Auction escrow refunds outbid player and settles exactly once", async () =
     (await request(v.token, "/auction/bid", { id: a.id, amount })).status,
     200,
   );
-  assert.equal((await request(u.token, "/state")).body.profile.coins, 110000);
+  assert.equal((await request(u.token, "/state")).body.profile.coins, 150000);
   assert.equal(
     (await request(v.token, "/state")).body.profile.coins,
-    110000 - amount,
+    150000 - amount,
   );
   await db.query(
     "UPDATE auctions SET ends_at=now()-interval '1 second' WHERE id=$1",
@@ -297,7 +297,7 @@ test("Selected zone controls the drop and paid price; unknown zones and client p
   const first = await request(u.token, "/spin", { tld: "ua" });
   assert.equal(first.status, 200);
   assert.equal(first.body.state.pending.tld, "ua");
-  assert.equal(first.body.state.profile.coins, 10000);
+  assert.equal(first.body.state.profile.coins, 50000);
   await request(u.token, "/domain", {
     id: first.body.state.pending.id,
     action: "keep",
@@ -306,13 +306,13 @@ test("Selected zone controls the drop and paid price; unknown zones and client p
   const paid = await request(u.token, "/spin", { tld: "com" });
   assert.equal(paid.status, 200);
   assert.equal(paid.body.state.pending.tld, "com");
-  assert.equal(paid.body.state.profile.coins, 7750);
+  assert.equal(paid.body.state.profile.coins, 47750);
   await ready(u.userId);
   assert.equal((await request(u.token, "/reroll", { tld: "ua" })).status, 400);
   const rerolled = await request(u.token, "/reroll", {});
   assert.equal(rerolled.status, 200);
   assert.equal(rerolled.body.state.pending.tld, "com");
-  assert.equal(rerolled.body.state.profile.coins, 7750);
+  assert.equal(rerolled.body.state.profile.coins, 47750);
 });
 test("Pity cannot be transferred from cheap zones to premium zones", async () => {
   const u = await user(111);
@@ -356,7 +356,7 @@ test("RANDOM mode, its price and reroll behavior survive persisted results", asy
   await ready(u.userId);
   const paid = await request(u.token, "/spin", { tld: "random" });
   assert.equal(paid.status, 200);
-  assert.equal(paid.body.state.profile.coins, 9500);
+  assert.equal(paid.body.state.profile.coins, 49500);
   assert.equal(paid.body.state.pending.spin_mode, "random");
   await assert.rejects(
     db.query("UPDATE domains SET spin_mode='com' WHERE id=$1", [
@@ -367,7 +367,7 @@ test("RANDOM mode, its price and reroll behavior survive persisted results", asy
   const rerolled = await request(u.token, "/reroll", {});
   assert.equal(rerolled.status, 200);
   assert.equal(rerolled.body.state.pending.spin_mode, "random");
-  assert.equal(rerolled.body.state.profile.coins, 9500);
+  assert.equal(rerolled.body.state.profile.coins, 49500);
   assert.equal(
     (
       await db.query(

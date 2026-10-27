@@ -1,4 +1,11 @@
 import {
+  AdminConsole,
+  QuickSell,
+  Promo,
+  Records,
+  History,
+} from "./SystemScreens";
+import {
   useCallback,
   useEffect,
   useRef,
@@ -64,7 +71,11 @@ type Page =
   | "leaderboard"
   | "achievements"
   | "sets"
-  | "admin";
+  | "admin"
+  | "quick"
+  | "promo"
+  | "records"
+  | "history";
 export function App() {
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
@@ -173,6 +184,9 @@ export function App() {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page]);
   function navigate(next: Page) {
     if (rolling) return;
     setPublicId(null);
@@ -204,6 +218,21 @@ export function App() {
       </div>
     );
   const p = state.profile;
+  if (state.welcome !== null)
+    return (
+      <div className="panel welcome-panel">
+        <h1>WELCOME TO DOMAIN DROP</h1>
+        {toast && <p role="alert">{toast}</p>}
+        <p>Тебе начислено {number(state.welcome)} стартовых coins</p>
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => act("/welcome/ack")}
+        >
+          SPIN
+        </button>
+      </div>
+    );
   const locked = busy || rolling;
   return (
     <div className="app" data-theme={p.theme} data-page={page}>
@@ -282,6 +311,11 @@ export function App() {
           </div>
         </header>
         <main>
+          {state.account.frozen && page !== "spin" && (
+            <p className="account-notice">
+              Экономика аккаунта заморожена. Коллекция доступна для просмотра.
+            </p>
+          )}
           {page === "spin" && (
             <SpinPanel
               state={state}
@@ -425,8 +459,16 @@ export function App() {
             </>
           )}
           {page === "admin" && p.admin && (
-            <Admin refresh={refresh} busy={busy} act={act} />
+            <AdminConsole refresh={refresh} busy={busy} act={act} />
           )}
+          {page === "quick" && (
+            <QuickSell state={state} busy={busy} act={act} />
+          )}
+          {page === "promo" && <Promo busy={busy} act={act} />}
+          {page === "records" && (
+            <Records refresh={refresh} onDetails={setSelected} />
+          )}
+          {page === "history" && <History refresh={refresh} />}
           {page === "more" && (
             <>
               <SectionTitle
@@ -520,6 +562,14 @@ export function App() {
                       icon: Grid2X2,
                       title: "Коллекционные наборы",
                     },
+                    { page: "quick", icon: Zap, title: "Quick Sell" },
+                    {
+                      page: "records",
+                      icon: Trophy,
+                      title: "Глобальные рекорды",
+                    },
+                    { page: "promo", icon: Sparkles, title: "Промокод" },
+                    { page: "history", icon: Coins, title: "История операций" },
                     { page: "auction", icon: Trophy, title: "Аукцион" },
                     { page: "scanner", icon: ScanLine, title: "Scanner" },
                     { page: "quests", icon: Target, title: "Задания" },

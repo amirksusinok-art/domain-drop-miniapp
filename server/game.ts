@@ -1,3 +1,4 @@
+import * as systems from "./systems.js";
 import { randomUUID, createHash } from "node:crypto";
 import type { DBClient, Database } from "./db.js";
 import { GameError } from "./auth.js";
@@ -130,8 +131,12 @@ export const isAdmin = (telegramId: string) =>
     .map((s) => s.trim())
     .includes(telegramId);
 export async function configFor(c: DBClient): Promise<Config> {
-  return (await c.query("SELECT config FROM settings WHERE id=1")).rows[0]
-    .config;
+  const config = (await c.query("SELECT config FROM settings WHERE id=1"))
+    .rows[0].config;
+  return {
+    ...config,
+    tlds: config.tlds.filter((t: any) => t.enabled !== false),
+  };
 }
 export async function lockUser(c: DBClient, id: string) {
   const user = (
@@ -179,6 +184,7 @@ export async function progress(
 export async function awardXp(c: DBClient, userId: string, xp: number) {
   const u = (await c.query("SELECT xp FROM users WHERE id=$1", [userId]))
     .rows[0];
+  if (u.xp + xp > 2000000000) throw new GameError(409, "Достигнут лимит XP");
   const before = levelFor(u.xp),
     after = levelFor(u.xp + xp);
   await c.query(
@@ -195,8 +201,9 @@ export async function insertDomain(
   spinMode?: string,
 ) {
   const id = randomUUID();
+  const meta = await systems.serialAndDiscovery(c, userId, drop, source);
   await c.query(
-    "INSERT INTO domains(id,owner_id,name,tld,rarity,score,value,tags,breakdown,status,source,spin_mode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+    "INSERT INTO domains(id,owner_id,name,tld,rarity,score,value,tags,breakdown,status,source,spin_mode,serial,finder_id,discovery) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",
     [
       id,
       userId,
@@ -210,6 +217,9 @@ export async function insertDomain(
       status,
       source,
       spinMode ?? null,
+      meta.serial,
+      meta.finder,
+      JSON.stringify(meta.discovery),
     ],
   );
   return id;
@@ -249,16 +259,19 @@ export async function state(c: DBClient, userId: string): Promise<State> {
   ).rows[0];
   if (!u) throw new GameError(401, "Войдите заново");
   const config = await configFor(c);
+  const sys = await systems.systems(c);
   const zonePity = (
     await c.query("SELECT tld,counter FROM zone_pity WHERE user_id=$1", [
       userId,
     ])
   ).rows;
-  const activeEvents = (
-    await c.query(
-      "SELECT * FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC",
-    )
-  ).rows;
+  const activeEvents = !sys.flags.events
+    ? []
+    : (
+        await c.query(
+          "SELECT * FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC",
+        )
+      ).rows;
   const collection = (
     await c.query(
       "SELECT count(*)::integer AS count,COALESCE(sum(value),0) AS value FROM domains WHERE owner_id=$1 AND status='kept'",
@@ -273,7 +286,7 @@ export async function state(c: DBClient, userId: string): Promise<State> {
   ).rows;
   const best = (
     await c.query(
-      "SELECT * FROM domains WHERE owner_id=$1 AND status='kept' ORDER BY value DESC LIMIT 1",
+      "SELECT * FROM domains WHERE COALESCE(finder_id,owner_id)=$1 AND source IN ('spin','reroll','scanner') ORDER BY value DESC,created_at,id LIMIT 1",
       [userId],
     )
   ).rows[0];
@@ -286,11 +299,22 @@ export async function state(c: DBClient, userId: string): Promise<State> {
     ).rows[0]?.tld ?? null;
   const pending = (
     await c.query(
-      "SELECT * FROM domains WHERE owner_id=$1 AND status='pending'",
+      "SELECT * FROM domains WHERE owner_id=$1 AND (status='pending' OR (quick_sold=true AND acknowledged=false)) ORDER BY created_at DESC LIMIT 1",
       [userId],
     )
   ).rows[0];
   return {
+    systems: sys,
+    account: {
+      frozen: u.frozen,
+      banned:
+        u.permanent_ban ||
+        !!(u.banned_until && new Date(u.banned_until).getTime() > Date.now()),
+      maintenance: config.maintenance && !isAdmin(u.telegram_id),
+    },
+    welcome: u.welcome_ack ? null : u.welcome_amount,
+    quickSell: { level: u.quick_level, rules: u.quick_rules },
+    cosmetics: u.cosmetics,
     profile: {
       id: u.id,
       username: u.username,
@@ -404,7 +428,39 @@ export async function mutate(
         503,
         "Техническое обслуживание. Вернитесь немного позже",
       );
+    await systems.access(c, u, action, body);
     const data = await fn(c, u, config);
+    const security = (await systems.systems(c)).security;
+    const stats = (
+      await c.query(
+        "SELECT count(*) FILTER(WHERE kind='spin') AS n FROM spins WHERE user_id=$1 AND created_at>=(now() AT TIME ZONE 'UTC')::date AT TIME ZONE 'UTC'",
+        [userId],
+      )
+    ).rows[0];
+    if (Number(stats.n) >= security.spinsPerDay)
+      await systems.flag(c, userId, "spin_rate", { count: Number(stats.n) });
+    const gains = Number(
+      (
+        await c.query(
+          "SELECT COALESCE(sum(amount),0) AS n FROM transactions WHERE user_id=$1 AND created_at>=(now() AT TIME ZONE 'UTC')::date AT TIME ZONE 'UTC'",
+          [userId],
+        )
+      ).rows[0].n,
+    );
+    if (gains >= security.coinGrowth)
+      await systems.flag(c, userId, "coin_growth", { amount: gains });
+    if (action === "/auction/bid") {
+      const n = Number(
+        (
+          await c.query(
+            "SELECT count(*) AS n FROM auction_bids WHERE user_id=$1 AND created_at>=(now() AT TIME ZONE 'UTC')::date AT TIME ZONE 'UTC'",
+            [userId],
+          )
+        ).rows[0].n,
+      );
+      if (n >= security.bidsPerDay)
+        await systems.flag(c, userId, "auction_activity", { count: n });
+    }
     const response = { data, state: await state(c, userId) };
     await c.query(
       "INSERT INTO requests(user_id,key,fingerprint,response) VALUES($1,$2,$3,$4)",
@@ -441,6 +497,7 @@ async function recordDrop(
   if (rare) await progress(c, u.id, "rare");
   if (drop.tags.includes("SHORT") || drop.tags.includes("ULTRA SHORT"))
     await progress(c, u.id, "short");
+  await systems.quickSell(c, u, id);
   return id;
 }
 export async function spin(
@@ -454,10 +511,12 @@ export async function spin(
     throw new GameError(429, "Подождите секунду перед следующим вращением");
   const pending = (
     await c.query(
-      "SELECT id,tld,spin_mode FROM domains WHERE owner_id=$1 AND status='pending'",
+      "SELECT id,tld,spin_mode,status FROM domains WHERE owner_id=$1 AND (status='pending' OR (quick_sold=true AND acknowledged=false))",
       [u.id],
     )
   ).rows[0];
+  if (pending?.status === "sold")
+    throw new GameError(409, "Подтвердите результат Quick Sell");
   const selectedTld = reroll
     ? (pending?.spin_mode ?? pending?.tld)
     : requestedTld;
@@ -516,11 +575,13 @@ export async function spin(
     await credit(c, u.id, -cost, u.free_spin ? "first_free_spin" : "spin");
     await c.query("UPDATE users SET free_spin=false WHERE id=$1", [u.id]);
   }
-  const event = (
-    await c.query(
-      "SELECT tld,boost FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1",
-    )
-  ).rows[0];
+  const event = !(await systems.systems(c)).flags.events
+    ? undefined
+    : (
+        await c.query(
+          "SELECT tld,boost FROM events WHERE starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1",
+        )
+      ).rows[0];
   const drop =
     selectedTld === "random"
       ? generateRandom(
@@ -534,7 +595,7 @@ export async function spin(
           selectedTld!,
           pity,
           undefined,
-          event?.tld === selectedTld ? Number(event.boost) : 1,
+          event && event.tld === selectedTld ? Number(event.boost) : 1,
         );
   const id = await recordDrop(
     c,
@@ -635,7 +696,7 @@ export async function scannerOpen(c: DBClient, u: any, config: Config) {
   if (
     (
       await c.query(
-        "SELECT id FROM domains WHERE owner_id=$1 AND status='pending'",
+        "SELECT id FROM domains WHERE owner_id=$1 AND (status='pending' OR (quick_sold=true AND acknowledged=false))",
         [u.id],
       )
     ).rowCount
@@ -684,7 +745,7 @@ export async function scannerPick(
   if (
     (
       await c.query(
-        "SELECT id FROM domains WHERE owner_id=$1 AND status='pending'",
+        "SELECT id FROM domains WHERE owner_id=$1 AND (status='pending' OR (quick_sold=true AND acknowledged=false))",
         [u.id],
       )
     ).rowCount
@@ -864,7 +925,7 @@ export async function scheduler(db: Database) {
     const active = (
       await c.query("SELECT id FROM auctions WHERE status='active' LIMIT 1")
     ).rowCount;
-    if (!active) {
+    if (!active && (await systems.systems(c)).flags.auction) {
       const config = await configFor(c);
       const tld = config.tlds.find((t) => t.name === "ai") ?? config.tlds[0];
       const drop = evaluate("777", tld, config);

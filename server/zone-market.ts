@@ -179,7 +179,11 @@ export function chanceFor(
   if (pity >= config.pityGuarantee - 1) return 1;
   const boost =
     pity >= config.pityStart
-      ? Math.min(0.08, 0.01 + (pity - config.pityStart) * 0.004)
+      ? Math.min(
+          config.pityMaxBoost ?? 0.08,
+          (config.pityBaseBoost ?? 0.01) +
+            (pity - config.pityStart) * (config.pityStep ?? 0.004),
+        )
       : 0;
   return Math.min(0.95, zone.baseRareChance * eventBoost + boost);
 }
