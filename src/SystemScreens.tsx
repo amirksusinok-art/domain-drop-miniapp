@@ -1,3 +1,4 @@
+import { displayName } from "./preferences";
 import { useEffect, useState } from "react";
 import type { State, Domain } from "../shared/types";
 import { api } from "./api";
@@ -41,9 +42,7 @@ export function QuickSell({
   act: Act;
 }) {
   const [rules, setRules] = useState(state.quickSell.rules);
-  const [zoneText, setZoneText] = useState(
-    state.quickSell.rules.tlds.join(", "),
-  );
+  const [zoneSearch, setZoneSearch] = useState("");
   useEffect(() => setRules(state.quickSell.rules), [state.quickSell]);
   const level = state.quickSell.level;
   return (
@@ -120,15 +119,63 @@ export function QuickSell({
             }
           />
         </label>
-        <label>
-          Зоны через запятую · уровень 4
+        <fieldset className="quick-zones" disabled={level < 4 || busy}>
+          <legend>Зоны · уровень 4</legend>
+          <p>
+            {rules.tlds.length
+              ? "Выбрано зон: " + rules.tlds.length
+              : "Все зоны: ограничение не задано"}
+          </p>
           <input
-            placeholder="xyz, site, online — пусто: все зоны"
-            disabled={level < 4}
-            value={zoneText}
-            onChange={(e) => setZoneText(e.target.value)}
+            aria-label="Поиск зоны"
+            placeholder="Найти зону"
+            value={zoneSearch}
+            onChange={(e) =>
+              setZoneSearch(e.target.value.toLowerCase().replaceAll(".", ""))
+            }
           />
-        </label>
+          <div
+            className="zone-chips"
+            role="group"
+            aria-label="Зоны для автопродажи"
+          >
+            {[
+              ...new Set([
+                ...rules.tlds,
+                ...state.config.zones
+                  .filter((z) => z.name !== "random")
+                  .map((z) => z.name),
+              ]),
+            ]
+              .filter((z) => z.includes(zoneSearch))
+              .map((tld) => (
+                <button
+                  type="button"
+                  key={tld}
+                  aria-pressed={rules.tlds.includes(tld)}
+                  onClick={() =>
+                    setRules((current) => ({
+                      ...current,
+                      tlds: current.tlds.includes(tld)
+                        ? current.tlds.filter((t) => t !== tld)
+                        : [...current.tlds, tld],
+                    }))
+                  }
+                >
+                  .{tld}
+                </button>
+              ))}
+          </div>
+          {!!rules.tlds.length && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setRules({ ...rules, tlds: [] })}
+            >
+              Снять выбор · все зоны
+            </button>
+          )}
+        </fieldset>
         <fieldset disabled={level < 5}>
           <legend>Дополнительная защита · уровень 5</legend>
           {(["SHORT", "TRIPLE", "PERFECT MATCH"] as const).map((t) => (
@@ -174,16 +221,7 @@ export function QuickSell({
         <button
           className="primary"
           disabled={busy || !level || !rules.rarities.length}
-          onClick={() =>
-            act("/quick/settings", {
-              ...rules,
-              tlds: zoneText
-                .replaceAll(".", "")
-                .split(",")
-                .map((t) => t.trim().toLowerCase())
-                .filter(Boolean),
-            })
-          }
+          onClick={() => act("/quick/settings", rules)}
         >
           Сохранить правила
         </button>
@@ -258,7 +296,7 @@ export function Records({
                   domain={data[key]}
                   onClick={() => onDetails(data[key])}
                 />
-                <p>@{data[key].username || data[key].first_name}</p>
+                <p>{displayName(data[key])}</p>
               </>
             ) : (
               <p>Находок пока нет</p>
@@ -270,7 +308,7 @@ export function Records({
       <div className="system-feed">
         {data?.feed.map((d: any) => (
           <button key={d.id} onClick={() => onDetails(d)}>
-            <b>@{d.username || d.first_name}</b> нашёл {d.name}.{d.tld}
+            <b>{displayName(d)}</b> нашёл {d.name}.{d.tld}
             {d.serial ? " #" + String(d.serial).padStart(4, "0") : ""}
             <small>
               {d.rarity} · {number(d.value)} coins
@@ -413,7 +451,7 @@ export function AdminConsole({
           {data.flags.map((f: any) => (
             <section className="panel" key={f.id}>
               <b>
-                {f.kind} · @{f.username}
+                {f.kind} · {displayName(f)}
               </b>
               <p>
                 {new Date(f.created_at).toLocaleString("ru-RU")} ·{" "}
@@ -558,8 +596,7 @@ function AdminPlayers({
               setPage(0);
             }}
           >
-            @{u.username || u.first_name} · {u.telegram_id} ·{" "}
-            {number(Number(u.coins))} coins
+            {displayName(u)} · {u.telegram_id} · {number(Number(u.coins))} coins
           </button>
         ))}
       </div>

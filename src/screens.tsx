@@ -70,10 +70,12 @@ export function Collection({
   refresh,
   initialFilter,
   onSelect,
+  onFilterChange,
 }: {
   refresh: number;
   initialFilter: string;
   onSelect: (d: Domain) => void;
+  onFilterChange?: (filter: string) => void;
 }) {
   const [filter, setFilter] = useState(initialFilter),
     [sort, setSort] = useState("date"),
@@ -96,6 +98,7 @@ export function Collection({
     refresh,
   );
   useEffect(() => setPage(0), [filter, sort, rarity, search, tld, tag]);
+  useEffect(() => setFilter(initialFilter), [initialFilter]);
   return (
     <>
       <SectionTitle eyebrow="КАЖДАЯ НАХОДКА ОСТАЁТСЯ СОБОЙ" title="Коллекция">
@@ -111,7 +114,10 @@ export function Collection({
           <button
             className={filter === v ? "active" : ""}
             key={v}
-            onClick={() => setFilter(v)}
+            onClick={() => {
+              setFilter(v);
+              onFilterChange?.(v);
+            }}
           >
             {label}
           </button>

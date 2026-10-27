@@ -1,24 +1,26 @@
 import {
+  initialNavigation,
+  pushRoute,
+  popRoute,
+  type Page,
+} from "./navigation";
+import { readPreference, savePreference } from "./preferences";
+import { HomeOverview } from "./HomeOverview";
+import {
   AdminConsole,
   QuickSell,
   Promo,
   Records,
   History,
 } from "./SystemScreens";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   ChevronRight,
   Coins,
   Disc3,
+  Home,
   Globe2,
   Grid2X2,
   Heart,
@@ -26,7 +28,6 @@ import {
   LockKeyhole,
   Menu,
   Radio,
-  RefreshCw,
   ScanLine,
   Settings2,
   ShieldCheck,
@@ -40,13 +41,12 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import type { Auction, Domain, State } from "../shared/types";
-import { rarities } from "../shared/types";
+import type { Domain, State } from "../shared/types";
 import { SpinPanel } from "./SpinPanel";
 import { SpinExtras } from "./SpinExtras";
 import { api, authenticate, mutation } from "./api";
 import { setupTelegram } from "./telegram";
-import { DomainCard, Empty, SectionTitle, colors, number } from "./components";
+import { Empty, SectionTitle, number } from "./components";
 import {
   Collection,
   DomainModal,
@@ -56,32 +56,14 @@ import {
   Leaderboard,
   Themes,
   Rewards,
-  Admin,
 } from "./screens";
-type Page =
-  | "spin"
-  | "collection"
-  | "auction"
-  | "scanner"
-  | "quests"
-  | "profile"
-  | "more"
-  | "themes"
-  | "events"
-  | "leaderboard"
-  | "achievements"
-  | "sets"
-  | "admin"
-  | "quick"
-  | "promo"
-  | "records"
-  | "history";
 export function App() {
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
-    [page, setPage] = useState<Page>("spin");
+    [navigation, setNavigation] = useState(initialNavigation);
+  const { page, filter: collectionFilter, publicId } = navigation.current;
   const [fast, setFast] = useState(() => {
     try {
       return localStorage.getItem("domain-drop-fast-spin") === "true";
@@ -100,12 +82,16 @@ export function App() {
   }
   const [rerollFrom, setRerollFrom] = useState<Domain | null>(null);
   const [rolling, setRolling] = useState(false),
-    [sound, setSound] = useState(false),
+    [sound, setSound] = useState(() => readPreference("domain-drop-sound")),
     [selected, setSelected] = useState<Domain | null>(null),
     [toast, setToast] = useState(""),
-    [refresh, setRefresh] = useState(0),
-    [collectionFilter, setCollectionFilter] = useState("all"),
-    [publicId, setPublicId] = useState<string | null>(null);
+    [refresh, setRefresh] = useState(0);
+  function toggleSound() {
+    setSound((current) => {
+      savePreference("domain-drop-sound", !current);
+      return !current;
+    });
+  }
   const actionLock = useRef(false);
   const initialized = useRef(false);
   const start = useCallback(async () => {
@@ -131,19 +117,24 @@ export function App() {
     const timer = setTimeout(() => setToast(""), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    const back = () => {
-      setPage("spin");
-      setPublicId(null);
+  const canBack = !!selected || navigation.stack.length > 0;
+  function goBack() {
+    if (rolling) return;
+    if (selected) {
       setSelected(null);
-    };
+      return;
+    }
+    setNavigation(popRoute);
+  }
+  useEffect(() => {
     const button = window.Telegram?.WebApp?.BackButton;
-    if (page !== "spin") {
+    const back = () => goBack();
+    if (canBack) {
       button?.show();
       button?.onClick(back);
     } else button?.hide();
     return () => button?.offClick(back);
-  }, [page]);
+  }, [canBack, selected, rolling, navigation]);
   useEffect(() => {
     if (!state) return;
     const f = () => {
@@ -185,12 +176,22 @@ export function App() {
     }
   }
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [page]);
-  function navigate(next: Page) {
+    const id = requestAnimationFrame(() =>
+      window.scrollTo(0, navigation.current.scroll),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [
+    navigation.current.page,
+    navigation.current.publicId,
+    navigation.current.filter,
+  ]);
+  function navigate(
+    next: Page,
+    options: Partial<{ filter: string; publicId: string | null }> = {},
+  ) {
     if (rolling) return;
-    setPublicId(null);
-    setPage(next);
+    setSelected(null);
+    setNavigation((nav) => pushRoute(nav, next, window.scrollY, options));
   }
   if (loading)
     return (
@@ -256,14 +257,19 @@ export function App() {
         <nav>
           {(
             [
-              ["spin", Disc3, "Генератор"],
+              ["home", Home, "Главная"],
+              ["collection", Layers3, "Коллекция"],
+              ["spin", Disc3, "SPIN"],
+              ["quests", Target, "Задания"],
               ["more", Menu, "Ещё"],
             ] as const
           ).map(([key, Icon, label]) => (
             <button
               key={key}
               className={
-                page === key || (key === "more" && page !== "spin")
+                page === key ||
+                (key === "more" &&
+                  !["home", "collection", "spin", "quests"].includes(page))
                   ? "active"
                   : ""
               }
@@ -288,6 +294,16 @@ export function App() {
         <header
           className={"topbar " + (page === "spin" ? "minimal-topbar" : "")}
         >
+          {canBack && (
+            <button
+              className="page-back"
+              aria-label="Назад"
+              disabled={rolling}
+              onClick={goBack}
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <button className="profile-chip" onClick={() => navigate("profile")}>
             <span className="avatar">{p.first_name.slice(0, 1)}</span>
             <span>
@@ -304,7 +320,7 @@ export function App() {
             <button
               className="icon-button"
               aria-label={sound ? "Выключить звук" : "Включить звук"}
-              onClick={() => setSound(!sound)}
+              onClick={toggleSound}
             >
               {sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
             </button>
@@ -315,6 +331,16 @@ export function App() {
             <p className="account-notice">
               Экономика аккаунта заморожена. Коллекция доступна для просмотра.
             </p>
+          )}
+          {page === "home" && (
+            <HomeOverview
+              state={state}
+              refresh={refresh}
+              busy={busy}
+              act={act}
+              onCollection={() => navigate("collection")}
+              onDomain={setSelected}
+            />
           )}
           {page === "spin" && (
             <SpinPanel
@@ -334,6 +360,12 @@ export function App() {
             <Collection
               refresh={refresh}
               initialFilter={collectionFilter}
+              onFilterChange={(filter) =>
+                setNavigation((nav) => ({
+                  ...nav,
+                  current: { ...nav.current, filter },
+                }))
+              }
               onSelect={setSelected}
             />
           )}
@@ -406,8 +438,7 @@ export function App() {
             <Leaderboard
               refresh={refresh}
               onProfile={(id) => {
-                setPublicId(id);
-                setPage("profile");
+                navigate("profile", { publicId: id });
               }}
             />
           )}
@@ -471,80 +502,21 @@ export function App() {
           {page === "history" && <History refresh={refresh} />}
           {page === "more" && (
             <>
-              <SectionTitle
-                eyebrow="ЕЩЁ БОЛЬШЕ DOMAIN DROP"
-                title="Твой мир доменов"
-              />
-              <div className="home-grid">
-                <button
-                  className="daily-promo"
-                  disabled={busy || p.daily_claimed}
-                  onClick={() => act("/daily")}
-                >
-                  <span className="promo-icon">
-                    <Coins />
-                  </span>
-                  <div>
-                    <span className="eyebrow">ЕЖЕДНЕВНЫЙ БОНУС</span>
-                    <h3>
-                      {p.daily_claimed
-                        ? "До завтра!"
-                        : `+${number(state.config.dailyReward)} coins`}
-                    </h3>
-                    <p>
-                      {p.daily_claimed
-                        ? "Новая награда в 00:00 UTC"
-                        : "Забери награду и продолжай охоту"}
-                    </p>
-                  </div>
-                  {p.daily_claimed ? <Check /> : <ArrowUp />}
-                </button>
-                <button
-                  className="collection-promo"
-                  onClick={() => navigate("collection")}
-                >
-                  <div>
-                    <span className="eyebrow">ТВОЯ КОЛЛЕКЦИЯ</span>
-                    <h3>
-                      {p.collection_count} <small>доменов</small>
-                    </h3>
-                    <p>Каждая находка — твоя история</p>
-                  </div>
-                  <Layers3 size={32} />
-                </button>
-              </div>
-              <div className="discover-heading">
-                <h3>За чем охотимся</h3>
-                <span>Примеры редких находок</span>
-              </div>
-              <div className="preview-grid">
-                {[
-                  { name: "777", tld: "ai", rarity: "LEGENDARY" },
-                  { name: "game", tld: "gg", rarity: "EPIC" },
-                  { name: "888", tld: "com", rarity: "MYTHIC" },
-                ].map((d) => (
-                  <DomainCard key={d.name} domain={d} />
-                ))}
-              </div>
-              <p className="fine-print">
-                Домены — виртуальные коллекционные предметы. Их нельзя улучшать,
-                регистрировать или обменивать на реальные деньги.
-              </p>
-              <SpinExtras
-                state={state}
-                fast={fast}
-                sound={sound}
-                onFast={toggleFast}
-                onSound={() => setSound(!sound)}
-              />
-              <div className="menu-grid">
-                {(
-                  [
-                    {
-                      page: "profile",
-                      icon: User,
-                      title: "Профиль и Showcase",
-                    },
+              <SectionTitle eyebrow="DOMAIN DROP" title="Ещё" />
+              {[
+                {
+                  title: "Игра",
+                  items: [
+                    { page: "scanner", icon: ScanLine, title: "Scanner" },
+                    { page: "auction", icon: Trophy, title: "Аукцион" },
+                    { page: "quests", icon: Target, title: "Задания" },
+                    { page: "events", icon: Radio, title: "События" },
+                    { page: "quick", icon: Zap, title: "Quick Sell" },
+                  ],
+                },
+                {
+                  title: "Коллекция",
+                  items: [
                     {
                       page: "collection",
                       icon: Heart,
@@ -557,56 +529,66 @@ export function App() {
                       title: "Сейф",
                       filter: "vault",
                     },
-                    {
-                      page: "sets",
-                      icon: Grid2X2,
-                      title: "Коллекционные наборы",
-                    },
-                    { page: "quick", icon: Zap, title: "Quick Sell" },
+                    { page: "sets", icon: Grid2X2, title: "Наборы" },
+                    { page: "profile", icon: User, title: "Showcase" },
+                  ],
+                },
+                {
+                  title: "Профиль",
+                  items: [
                     {
                       page: "records",
                       icon: Trophy,
                       title: "Глобальные рекорды",
                     },
-                    { page: "promo", icon: Sparkles, title: "Промокод" },
-                    { page: "history", icon: Coins, title: "История операций" },
-                    { page: "auction", icon: Trophy, title: "Аукцион" },
-                    { page: "scanner", icon: ScanLine, title: "Scanner" },
-                    { page: "quests", icon: Target, title: "Задания" },
+                    { page: "achievements", icon: Star, title: "Достижения" },
                     { page: "themes", icon: Sparkles, title: "Темы" },
-                    { page: "events", icon: Radio, title: "События" },
-                    { page: "achievements", icon: Trophy, title: "Достижения" },
+                    { page: "history", icon: Coins, title: "История операций" },
+                    { page: "promo", icon: Sparkles, title: "Промокод" },
                     { page: "leaderboard", icon: Star, title: "Рейтинг" },
-                    ...(p.admin
-                      ? [
-                          {
-                            page: "admin",
-                            icon: Settings2,
-                            title: "Панель управления",
-                          },
-                        ]
-                      : []),
-                  ] as {
-                    page: Page;
-                    icon: typeof User;
-                    title: string;
-                    filter?: string;
-                  }[]
-                ).map((item) => (
-                  <button
-                    key={item.title}
-                    className="menu-item"
-                    onClick={() => {
-                      setCollectionFilter(item.filter ?? "all");
-                      navigate(item.page);
-                    }}
-                  >
-                    <item.icon />
-                    <b>{item.title}</b>
-                    <ChevronRight size={18} />
-                  </button>
-                ))}
-              </div>
+                  ],
+                },
+              ].map((group) => (
+                <section className="more-group" key={group.title}>
+                  <h2>{group.title}</h2>
+                  <div className="menu-grid">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.title}
+                        className="menu-item"
+                        onClick={() =>
+                          navigate(item.page as Page, {
+                            filter: "filter" in item ? item.filter : "all",
+                          })
+                        }
+                      >
+                        <item.icon />
+                        <b>{item.title}</b>
+                        <ChevronRight size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+              <details className="more-settings">
+                <summary>Настройки</summary>
+                <SpinExtras
+                  state={state}
+                  fast={fast}
+                  sound={sound}
+                  onFast={toggleFast}
+                  onSound={toggleSound}
+                />
+              </details>
+              {p.admin && (
+                <button
+                  className="secondary owner-entry"
+                  onClick={() => navigate("admin")}
+                >
+                  <Settings2 size={18} />
+                  Панель управления
+                </button>
+              )}
             </>
           )}
         </main>
@@ -615,19 +597,25 @@ export function App() {
           <small>Коллекционируй то, что выпало.</small>
         </footer>
       </div>
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" aria-label="Основная навигация">
         {(
           [
-            ["spin", Disc3, "Генератор"],
+            ["home", Home, "Главная"],
+            ["collection", Layers3, "Коллекция"],
+            ["spin", Disc3, "SPIN"],
+            ["quests", Target, "Задания"],
             ["more", Menu, "Ещё"],
           ] as const
         ).map(([key, Icon, label]) => (
           <button
             key={key}
             className={
-              page === key || (key === "more" && page !== "spin")
+              (key === "spin" ? "nav-spin " : "") +
+              (page === key ||
+              (key === "more" &&
+                !["home", "collection", "spin", "quests"].includes(page))
                 ? "active"
-                : ""
+                : "")
             }
             disabled={rolling}
             onClick={() => {
@@ -661,7 +649,4 @@ export function App() {
       )}
     </div>
   );
-}
-function ArrowUp() {
-  return <ArrowRight size={22} />;
 }
