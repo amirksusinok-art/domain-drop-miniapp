@@ -6,12 +6,16 @@ export function SpinExtras({
   state,
   fast,
   sound,
+  specialSound,
+  onSpecialSound,
   onFast,
   onSound,
 }: {
   state: State;
   fast: boolean;
   sound: boolean;
+  specialSound: boolean;
+  onSpecialSound: () => void;
   onFast: () => void;
   onSound: () => void;
 }) {
@@ -30,6 +34,14 @@ export function SpinExtras({
         </button>
         <button className="secondary" aria-pressed={sound} onClick={onSound}>
           <Volume2 size={17} /> Звук · {sound ? "ВКЛ" : "ВЫКЛ"}
+        </button>
+        <button
+          className="secondary"
+          aria-pressed={specialSound}
+          onClick={onSpecialSound}
+        >
+          <Sparkles size={17} /> Legendary / Mythic ·{" "}
+          {specialSound ? "ВКЛ" : "ВЫКЛ"}
         </button>
       </div>
       <p className="muted">

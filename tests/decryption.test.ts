@@ -103,7 +103,7 @@ test("Fixed TLD stays known throughout decryption without a secret-zone phase", 
   assert.equal(frames.at(-1)?.stage, "ready");
 });
 
-test("Rarity follows the fully visible domain by 300ms for Legendary and 400ms otherwise in RANDOM and fixed TLD modes", () => {
+test("Rarity follows the full domain after their rarity-specific silence and signal in RANDOM and fixed TLD modes", () => {
   for (const rarity of rarities)
     for (const fixed of [false, true])
       for (const fast of [false, true]) {
@@ -115,13 +115,13 @@ test("Rarity follows the fully visible domain by 300ms for Legendary and 400ms o
         const reveal = frames.find((f) => f.stage === "rarity")!;
         assert.equal(
           reveal.at - complete.at,
-          rarity === "LEGENDARY" ? 300 : 400,
+          rarity === "MYTHIC" ? 650 : rarity === "LEGENDARY" ? 450 : 300,
         );
         assert.ok(frames.find((f) => f.stage === "value")!.at > reveal.at);
       }
 });
 
-test("Mythic UNKNOWN SIGNAL has a readable pause before random TLD lock; reveal clocks remain monotonic", () => {
+test("Mythic UNKNOWN SIGNAL follows full domain lock after a readable silence; reveal clocks remain monotonic", () => {
   for (const rarity of rarities) {
     for (const fixed of [false, true]) {
       const frames = revealTimeline(drop(rarity), false, false, false, fixed);
@@ -130,9 +130,11 @@ test("Mythic UNKNOWN SIGNAL has a readable pause before random TLD lock; reveal 
     }
   }
   const frames = revealTimeline(drop("MYTHIC"));
-  assert.ok(
-    frames.find((f) => f.stage === "tld")!.at -
-      frames.find((f) => f.stage === "signal")!.at >=
-      250,
+  const full = frames.find((f) => f.nameLocked === 3 && f.tldLocked === 2)!;
+  assert.equal(frames.find((f) => f.stage === "analyzing")!.at - full.at, 400);
+  assert.equal(
+    frames.find((f) => f.stage === "rarity")!.at -
+      frames.find((f) => f.stage === "analyzing")!.at,
+    250,
   );
 });

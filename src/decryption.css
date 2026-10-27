@@ -303,9 +303,6 @@
   letter-spacing: 0.2px;
   margin: 20px 0 0;
 }
-.decryption-stage[data-stage="idle"] .decrypt-rewards {
-  display: none;
-}
 .decrypt-controls {
   padding-top: 12px;
   padding-bottom: 25px;
@@ -668,10 +665,6 @@
   color: #d6e6ff;
   font-size: 12px;
   min-height: 46px;
-}
-.zone-picker.is-locked > select,
-.zone-picker.is-locked > .zone-shortcuts {
-  display: none;
 }
 .zone-shortcuts {
   display: grid;

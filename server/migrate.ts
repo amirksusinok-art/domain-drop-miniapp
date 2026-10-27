@@ -90,6 +90,10 @@ export async function migrate(db: Database) {
       );
       await c.query("INSERT INTO schema_migrations(version) VALUES(5)");
     }
+    await c.exec(await readFile(resolve("server/play-features.sql"), "utf8"));
+    await c.query(
+      "INSERT INTO schema_migrations(version) VALUES(6) ON CONFLICT DO NOTHING",
+    );
     await c.query(
       "INSERT INTO schema_migrations(version) VALUES(3) ON CONFLICT DO NOTHING",
     );

@@ -61,6 +61,7 @@ export type Profile = {
   rare_counts: Record<string, number>;
   best_domain: Domain | null;
   favorite_tld: string | null;
+  favorite_tld_count: number;
 };
 export type Quest = {
   id: string;
@@ -74,6 +75,9 @@ export type Quest = {
   claimed: boolean;
 };
 export type Auction = {
+  kind: "daily" | "live" | "manual";
+  watched: boolean;
+  bidder_username: string | null;
   id: string;
   domain: Domain;
   ends_at: string;

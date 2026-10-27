@@ -1,3 +1,4 @@
+import * as play from "./play-features.js";
 import { registerSystems } from "./system-routes.js";
 import * as systems from "./systems.js";
 import express, {
@@ -322,7 +323,8 @@ export function createApp(db: Database) {
   app.get("/api/auctions", async (_req, res) => {
     const rows = (
       await db.query(
-        "SELECT a.*,u.first_name AS bidder_name FROM auctions a LEFT JOIN users u ON u.id=a.bidder_id ORDER BY a.starts_at DESC LIMIT 20",
+        `SELECT a.*,u.first_name AS bidder_name,u.username AS bidder_username,EXISTS(SELECT 1 FROM auction_watchlist w WHERE w.user_id=$1 AND w.auction_id=a.id) AS watched FROM auctions a LEFT JOIN users u ON u.id=a.bidder_id WHERE a.status='active' OR a.id IN (SELECT id FROM auctions WHERE status='settled' ORDER BY ends_at DESC LIMIT 20) OR EXISTS(SELECT 1 FROM auction_watchlist w WHERE w.user_id=$1 AND w.auction_id=a.id) ORDER BY a.starts_at DESC,a.id DESC`,
+        [res.locals.userId],
       )
     ).rows;
     res.json(
@@ -404,6 +406,25 @@ export function createApp(db: Database) {
       );
     });
   registerSystems(app, db, mutation);
+  app.get("/api/recent-drops", async (_req, res) =>
+    res.json(
+      await db.transaction((c) => play.recentDrops(c, res.locals.userId)),
+    ),
+  );
+  mutation(
+    "/auction/watch",
+    z.object({ id: z.uuid(), watched: z.boolean() }).strict(),
+    (c, u, _cfg, b) => play.watchAuction(c, u.id, b.id, b.watched),
+    (c, b, id) => game.auctionBeforeLock(c, b.id, id),
+  );
+  mutation("/collection/common/preview", z.object({}).strict(), (c, u) =>
+    play.previewCommon(c, u.id),
+  );
+  mutation(
+    "/collection/common/sell",
+    z.object({ id: z.uuid() }).strict(),
+    (c, u, _cfg, b) => play.sellCommon(c, u.id, b.id),
+  );
   const empty = z.object({}).strict();
   const idBody = z.object({ id: z.uuid() }).strict();
   mutation(

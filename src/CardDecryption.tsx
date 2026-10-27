@@ -25,6 +25,7 @@ export function CardDecryption({
   waiting,
   fast,
   sound,
+  specialSound = true,
   highValueThreshold,
   selectedZone,
   onDone,
@@ -36,6 +37,7 @@ export function CardDecryption({
   waiting: boolean;
   fast: boolean;
   sound: boolean;
+  specialSound?: boolean;
   highValueThreshold: number;
   selectedZone: string;
   onDone: () => void;
@@ -48,9 +50,11 @@ export function CardDecryption({
   const clock = useRef({ elapsed: 0, last: 0, speed: 1, index: 0 }),
     done = useRef(onDone),
     audio = useRef<AudioContext | null>(null),
-    soundRef = useRef(sound);
+    soundRef = useRef(sound),
+    specialSoundRef = useRef(specialSound);
   done.current = onDone;
   soundRef.current = sound;
+  specialSoundRef.current = specialSound;
   useEffect(() => {
     if (!animating || !result) {
       setFrame(idle);
@@ -70,9 +74,14 @@ export function CardDecryption({
     setAccelerated(false);
     let animation = 0,
       disposed = false,
-      lastTick = 0;
+      lastTick = 0,
+      lastHaptic = 0;
     const click = (impact = false) => {
       if (reduced) return;
+      if (!impact && performance.now() - lastHaptic >= 110) {
+        haptic("light");
+        lastHaptic = performance.now();
+      }
       if (impact)
         haptic(
           impact
@@ -88,6 +97,29 @@ export function CardDecryption({
         audio.current ??= new AudioContext();
         const ctx = audio.current;
         void ctx.resume().catch(() => {});
+        if (
+          impact &&
+          specialSoundRef.current &&
+          ["LEGENDARY", "MYTHIC"].includes(result.rarity)
+        ) {
+          const notes =
+            result.rarity === "MYTHIC" ? [220, 330, 440, 660] : [392, 494, 587];
+          notes.forEach((frequency, i) => {
+            const osc = ctx.createOscillator(),
+              gain = ctx.createGain(),
+              at = ctx.currentTime + i * 0.075;
+            osc.type = "sine";
+            osc.frequency.value = frequency;
+            gain.gain.setValueAtTime(0, at);
+            gain.gain.linearRampToValueAtTime(0.035, at + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, at + 0.24);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(at);
+            osc.stop(at + 0.25);
+          });
+          return;
+        }
         const osc = ctx.createOscillator(),
           gain = ctx.createGain();
         osc.frequency.value = impact ? 180 : 1100;
@@ -146,8 +178,11 @@ export function CardDecryption({
       disposed = true;
       cancelAnimationFrame(animation);
       if (audio.current) {
-        void audio.current.close().catch(() => {});
+        const context = audio.current;
         audio.current = null;
+        setTimeout(() => {
+          void context.close().catch(() => {});
+        }, 500);
       }
     };
   }, [animating, result?.id, previous?.id]);
@@ -201,8 +236,7 @@ export function CardDecryption({
           initializing: "INITIALIZING…",
           scramble: "RESOLVING DOMAIN…",
           name: "LOCKING CHARACTERS…",
-          signal:
-            result?.rarity === "MYTHIC" ? "UNKNOWN SIGNAL" : "NAME RESOLVED",
+          signal: "NAME RESOLVED",
           tld: "RESOLVING TLD…",
           multiplier: "TLD VERIFIED",
           analyzing:
@@ -221,8 +255,7 @@ export function CardDecryption({
   const dim =
     animating &&
     ["LEGENDARY", "MYTHIC"].includes(result?.rarity ?? "") &&
-    (stage === "analyzing" ||
-      (result?.rarity === "MYTHIC" && ["signal", "tld"].includes(stage)));
+    stage === "analyzing";
   return (
     <div
       className={
@@ -341,7 +374,9 @@ export function CardDecryption({
             </span>
           )}
         <div
-          className={"reveal-layer " + (valueReady ? "is-revealed" : "")}
+          className={
+            "reveal-layer value-slot " + (valueReady ? "is-revealed" : "")
+          }
           aria-hidden={!valueReady}
         >
           {valueReady && (
@@ -385,8 +420,8 @@ function AnimatedPrice({
     if (
       !eligible.current ||
       seen.current === result.id ||
-      result.rarity === "COMMON" ||
-      (!["EPIC", "LEGENDARY", "MYTHIC"].includes(result.rarity) &&
+      ["COMMON", "UNCOMMON"].includes(result.rarity) ||
+      (!["RARE", "EPIC", "LEGENDARY", "MYTHIC"].includes(result.rarity) &&
         result.value < 5000) ||
       matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {

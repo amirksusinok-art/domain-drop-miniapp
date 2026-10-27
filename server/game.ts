@@ -1,3 +1,4 @@
+import { fillAuctions } from "./play-features.js";
 import * as systems from "./systems.js";
 import { randomUUID, createHash } from "node:crypto";
 import type { DBClient, Database } from "./db.js";
@@ -290,13 +291,13 @@ export async function state(c: DBClient, userId: string): Promise<State> {
       [userId],
     )
   ).rows[0];
-  const tld =
+  const favoriteTld =
     (
       await c.query(
-        "SELECT tld FROM domains WHERE owner_id=$1 AND status='kept' GROUP BY tld ORDER BY count(*) DESC,tld LIMIT 1",
+        "SELECT d.tld,count(*)::integer AS count FROM spins s JOIN domains d ON d.id=s.domain_id WHERE s.user_id=$1 AND s.kind='spin' GROUP BY d.tld ORDER BY count(*) DESC,max(s.created_at) DESC,d.tld LIMIT 1",
         [userId],
       )
-    ).rows[0]?.tld ?? null;
+    ).rows[0] ?? null;
   const pending = (
     await c.query(
       "SELECT * FROM domains WHERE owner_id=$1 AND (status='pending' OR (quick_sold=true AND acknowledged=false)) ORDER BY created_at DESC LIMIT 1",
@@ -339,7 +340,8 @@ export async function state(c: DBClient, userId: string): Promise<State> {
         rareCounts.map((r) => [r.rarity, r.count]),
       ),
       best_domain: best ? domainView(best) : null,
-      favorite_tld: tld,
+      favorite_tld: favoriteTld?.tld ?? null,
+      favorite_tld_count: favoriteTld?.count ?? 0,
     },
     pending: pending ? domainView(pending) : null,
     config: {
@@ -919,22 +921,9 @@ export async function scheduler(db: Database) {
         [a.id, domainId],
       );
     }
-    const active = (
-      await c.query("SELECT id FROM auctions WHERE status='active' LIMIT 1")
-    ).rowCount;
-    if (!active && (await systems.systems(c)).flags.auction) {
-      const config = await configFor(c);
-      const tld = config.tlds.find((t) => t.name === "ai") ?? config.tlds[0];
-      const drop = evaluate("777", tld, config);
-      await c.query(
-        "INSERT INTO auctions(id,domain,ends_at,start_price) VALUES($1,$2,now()+interval '6 hours',$3)",
-        [
-          randomUUID(),
-          JSON.stringify(drop),
-          Math.max(1000, Math.round(drop.value * 0.5)),
-        ],
-      );
-    }
+    if ((await systems.systems(c)).flags.auction)
+      await fillAuctions(c, await configFor(c));
+    await c.query("DELETE FROM common_sale_quotes WHERE expires_at<now()");
     await c.query("DELETE FROM sessions WHERE expires_at<now()");
   });
 }

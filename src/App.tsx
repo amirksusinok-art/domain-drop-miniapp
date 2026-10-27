@@ -83,6 +83,9 @@ export function App() {
   const [rerollFrom, setRerollFrom] = useState<Domain | null>(null);
   const [rolling, setRolling] = useState(false),
     [sound, setSound] = useState(() => readPreference("domain-drop-sound")),
+    [specialSound, setSpecialSound] = useState(() =>
+      readPreference("domain-drop-special-sound", true),
+    ),
     [selected, setSelected] = useState<Domain | null>(null),
     [toast, setToast] = useState(""),
     [refresh, setRefresh] = useState(0);
@@ -337,6 +340,9 @@ export function App() {
               rolling={rolling}
               busy={busy}
               sound={sound}
+              specialSound={specialSound}
+              refresh={refresh}
+              onDomain={setSelected}
               fast={fast}
               onDone={() => setRolling(false)}
               act={act}
@@ -347,6 +353,8 @@ export function App() {
           {page === "collection" && (
             <Collection
               refresh={refresh}
+              busy={busy}
+              act={act}
               initialFilter={collectionFilter}
               onFilterChange={(filter) =>
                 setNavigation((nav) => ({
@@ -588,6 +596,13 @@ export function App() {
                   state={state}
                   fast={fast}
                   sound={sound}
+                  specialSound={specialSound}
+                  onSpecialSound={() =>
+                    setSpecialSound((current) => {
+                      savePreference("domain-drop-special-sound", !current);
+                      return !current;
+                    })
+                  }
                   onFast={toggleFast}
                   onSound={toggleSound}
                 />

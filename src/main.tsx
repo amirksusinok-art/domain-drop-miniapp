@@ -17,3 +17,4 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+import "./play-features.css";

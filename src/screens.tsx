@@ -1,3 +1,4 @@
+import { SellAllCommon } from "./PlayFeatures";
 import { ShareCard } from "./ShareCard";
 import {
   useCallback,
@@ -69,11 +70,15 @@ function LoadError({ error }: { error: string }) {
 export function Collection({
   refresh,
   initialFilter,
+  busy,
+  act,
   onSelect,
   onFilterChange,
 }: {
   refresh: number;
   initialFilter: string;
+  busy: boolean;
+  act: Action;
   onSelect: (d: Domain) => void;
   onFilterChange?: (filter: string) => void;
 }) {
@@ -104,6 +109,7 @@ export function Collection({
       <SectionTitle eyebrow="КАЖДАЯ НАХОДКА ОСТАЁТСЯ СОБОЙ" title="Коллекция">
         <span className="pill">{data?.total ?? 0} доменов</span>
       </SectionTitle>
+      <SellAllCommon busy={busy} act={act} />
       <div className="tabs">
         {[
           ["all", "Все домены"],
@@ -332,105 +338,7 @@ export function DomainModal({
     </dialog>
   );
 }
-export function Auctions({
-  refresh,
-  busy,
-  act,
-}: {
-  refresh: number;
-  busy: boolean;
-  act: Action;
-}) {
-  const { data, error } = useLoad<Auction[]>("/auctions", refresh);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <>
-      <SectionTitle eyebrow="РЕДКИЕ ДОМЕНЫ. ОДИН ПОБЕДИТЕЛЬ." title="Аукцион" />
-      <p className="muted">
-        Ставка резервирует coins. Если её перебьют, coins вернутся
-        автоматически.
-      </p>
-      <LoadError error={error} />
-      {data?.map((a) => (
-        <AuctionItem key={a.id} a={a} now={now} busy={busy} act={act} />
-      ))}
-      {data?.length === 0 && <Empty title="Готовим следующий лот" />}
-    </>
-  );
-}
-function AuctionItem({
-  a,
-  now,
-  busy,
-  act,
-}: {
-  a: Auction;
-  now: number;
-  busy: boolean;
-  act: Action;
-}) {
-  const [amount, setAmount] = useState(a.minimum);
-  useEffect(() => setAmount(a.minimum), [a.minimum]);
-  const seconds = Math.max(
-    0,
-    Math.floor((new Date(a.ends_at).getTime() - now) / 1000),
-  );
-  const countdown = [
-    Math.floor(seconds / 3600),
-    Math.floor(seconds / 60) % 60,
-    seconds % 60,
-  ]
-    .map((n) => String(n).padStart(2, "0"))
-    .join(":");
-  return (
-    <article className="auction-panel">
-      <DomainCard domain={a.domain} />
-      <div>
-        <span className="eyebrow">
-          {a.status === "active" ? "DAILY AUCTION" : "ЗАВЕРШЁН"}
-        </span>
-        <h2>{a.status === "active" ? countdown : "Лот закрыт"}</h2>
-        <p>
-          {a.bid
-            ? `Текущая ставка: ${number(a.bid)} coins`
-            : `Стартовая ставка: ${number(a.minimum)} coins`}
-        </p>
-        <p className="muted">
-          {a.mine
-            ? "Ваша ставка лидирует"
-            : a.bidder_name
-              ? `Лидирует: ${a.bidder_name}`
-              : "Станьте первым участником"}
-        </p>
-        {a.status === "active" && (
-          <div className="bid-form">
-            <label>
-              Ваша ставка
-              <input
-                type="number"
-                min={a.minimum}
-                step={1}
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-              />
-            </label>
-            <button
-              className="primary"
-              disabled={busy || seconds === 0 || amount < a.minimum}
-              onClick={() => act("/auction/bid", { id: a.id, amount })}
-            >
-              Сделать ставку
-            </button>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
+export { Auctions } from "./Auctions";
 export function Scanner({
   state,
   busy,
@@ -550,6 +458,15 @@ export function Profile({
               ? "@" + data.user.username
               : (data?.user.first_name ?? p.first_name)}
           </h2>
+          {!publicId && p.favorite_tld && (
+            <span
+              className="favorite-tld-badge"
+              title="По результатам обычных SPIN, включая RANDOM"
+            >
+              <Star size={13} /> FAVORITE TLD · .{p.favorite_tld.toUpperCase()}{" "}
+              · {p.favorite_tld_count} SPIN
+            </span>
+          )}
           <p className="muted">
             Уровень {data?.user.level ?? p.level}
             {!publicId ? ` · ${number(p.xp)} XP` : ""}
@@ -568,7 +485,6 @@ export function Profile({
               ["Вращения", number(p.spins)],
               ["Домены", number(p.collection_count)],
               ["Коллекция", number(p.collection_value) + " ◈"],
-              ["Любимый TLD", p.favorite_tld ? "." + p.favorite_tld : "—"],
             ].map(([l, v]) => (
               <div className="stat" key={l}>
                 <span>{l}</span>
@@ -607,7 +523,7 @@ export function Profile({
       )}
       {!publicId && p.best_domain && (
         <>
-          <h3>Самая дорогая находка в коллекции</h3>
+          <h3>Самая дорогая находка</h3>
           <DomainCard
             domain={p.best_domain}
             onClick={() => onDomain(p.best_domain!)}

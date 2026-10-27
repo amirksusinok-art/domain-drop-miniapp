@@ -1,3 +1,4 @@
+import { RecentDrops } from "./PlayFeatures";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, RefreshCw, Zap } from "lucide-react";
 import type { Domain, State } from "../shared/types";
@@ -11,6 +12,9 @@ export function SpinPanel({
   rolling,
   busy,
   sound,
+  specialSound,
+  refresh,
+  onDomain,
   fast,
   onDone,
   act,
@@ -22,6 +26,9 @@ export function SpinPanel({
   rolling: boolean;
   busy: boolean;
   sound: boolean;
+  specialSound: boolean;
+  refresh: number;
+  onDomain: (d: Domain) => void;
   fast: boolean;
   onDone: () => void;
   act: (path: string, body?: unknown, animate?: boolean) => Promise<unknown>;
@@ -48,13 +55,18 @@ export function SpinPanel({
     if (pendingMode) setChosen(pendingMode);
   }, [pendingMode]);
   useEffect(() => {
-    shortcuts.current?.querySelector("[aria-pressed=true]")?.scrollIntoView({
-      block: "nearest",
-      inline: "center",
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
+    const strip = shortcuts.current,
+      chip = strip?.querySelector<HTMLElement>("[aria-pressed=true]");
+    if (strip && chip)
+      strip.scrollTo({
+        left:
+          chip.offsetLeft -
+          strip.offsetLeft -
+          (strip.clientWidth - chip.offsetWidth) / 2,
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
   }, [selected?.name]);
   function choose(name: string) {
     setChosen(name);
@@ -68,228 +80,240 @@ export function SpinPanel({
   const deficit =
     selected && !p.free_spin ? Math.max(0, selected.spinPrice - p.coins) : 0;
   return (
-    <section
-      className={
-        "generator decryption-generator minimal-spin " +
-        (rolling ? "is-opening" : "")
-      }
-      aria-label="Генератор доменов"
-    >
-      {state.account.frozen && (
-        <p className="account-notice">
-          Экономика аккаунта заморожена. Коллекция доступна для просмотра.
-        </p>
-      )}
-      <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
-        <div className="selected-zone">
-          <span>
-            {selected?.name === "random"
-              ? "RANDOM"
-              : "." + selected?.name.toUpperCase()}
-          </span>
-          <small>{number(selected?.spinPrice ?? 0)} coins</small>
-        </div>
-        <div className="zone-shortcuts" ref={shortcuts}>
-          {[
-            ...new Set([
-              "random",
-              "xyz",
-              "ua",
-              "uk",
-              "gg",
-              "io",
-              "ai",
-              "com",
-              selected?.name ?? "random",
-            ]),
-          ]
-            .map((name) => zones.find((z) => z.name === name))
-            .filter((z) => !!z)
-            .map((z) => (
-              <button
-                type="button"
-                key={z.name}
-                aria-pressed={selected?.name === z.name}
-                className={selected?.name === z.name ? "active" : ""}
-                disabled={locked || !!state.pending || !!state.scanner}
-                onClick={() => choose(z.name)}
-              >
-                {z.name === "random" ? "RANDOM" : "." + z.name}
-                {selected?.name === z.name && (
-                  <small>{number(z.spinPrice)}</small>
-                )}
-              </button>
-            ))}
-          <button
-            type="button"
-            aria-expanded={allZones}
-            disabled={locked || !!state.pending || !!state.scanner}
-            onClick={() => setAllZones(!allZones)}
-          >
-            ALL TLD
-          </button>
-        </div>
-        {allZones && (
-          <ZoneSheet
-            zones={zones}
-            selected={selected?.name ?? "random"}
-            onChoose={choose}
-            onClose={() => setAllZones(false)}
-          />
-        )}
-      </div>
-      <CardDecryption
-        selectedZone={selected?.name ?? "random"}
-        result={state.pending}
-        previous={previous}
-        animating={rolling}
-        waiting={busy && !rolling}
-        fast={fast}
-        sound={sound}
-        highValueThreshold={
-          (selected?.spinPrice ?? state.config.spinPrice) * 20
-        }
-        onDone={onDone}
-        onDetails={onDetails}
-      />
-      <div
+    <>
+      <section
         className={
-          "compact-luck " +
-          ((selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
-            ? "quiet"
-            : "")
+          "generator decryption-generator minimal-spin " +
+          (rolling ? "is-opening" : "")
         }
-        aria-label={`Luck: ${selected?.pity ?? 0} из ${state.config.pityGuarantee}`}
+        aria-label="Генератор доменов"
       >
-        <span>
-          {(selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
-            ? "LUCK"
-            : (selected?.pity ?? 0) >= state.config.pityGuarantee - 1
-              ? "RARE+ ГАРАНТИРОВАН"
-              : (selected?.pity ?? 0) >= state.config.pityGuarantee - 4
-                ? "RARE+ CLOSE"
-                : (selected?.pity ?? 0) >= state.config.pityStart
-                  ? "LUCK +" +
-                    Math.max(
-                      0,
-                      Math.round(
-                        ((selected?.rareChance ?? 0) -
-                          (selected?.baseRareChance ?? 0)) *
-                          100,
-                      ),
-                    ) +
-                    "%"
-                  : "LUCK BUILDING"}
-        </span>
-        <progress
-          max={state.config.pityGuarantee}
-          value={selected?.pity ?? 0}
-        />
-      </div>
-      {state.pending && !rolling && (
-        <>
-          {" "}
-          <div className="drop-honors">
-            {state.pending.discovery?.globalRecord && (
-              <strong>NEW GLOBAL RECORD · #1 ALL TIME</strong>
-            )}
-            {state.pending.discovery?.personalBest && (
-              <span>
-                NEW PERSONAL BEST ·{" "}
-                {number(state.pending.discovery.oldPersonal ?? 0)} →{" "}
-                {number(state.pending.value)}
-              </span>
-            )}
-            {state.pending.discovery?.firstFound && (
-              <strong>
-                FIRST FOUND · Ты первым обнаружил {state.pending.name}.
-                {state.pending.tld} с запуска Serial
-              </strong>
-            )}
+        {state.account.frozen && (
+          <p className="account-notice">
+            Экономика аккаунта заморожена. Коллекция доступна для просмотра.
+          </p>
+        )}
+        <div className={"zone-picker" + (state.pending ? " is-locked" : "")}>
+          <div className="selected-zone">
+            <span>
+              {selected?.name === "random"
+                ? "RANDOM"
+                : "." + selected?.name.toUpperCase()}
+            </span>
+            <small>{number(selected?.spinPrice ?? 0)} coins</small>
           </div>
-        </>
-      )}
-      {state.pending && !rolling ? (
-        state.pending.quick_sold ? (
-          <div className="quick-sold">
-            <h3>QUICK SOLD</h3>
-            <p>+{number(state.pending.value)} coins</p>
+          <div className="zone-shortcuts" ref={shortcuts}>
+            {[
+              ...new Set([
+                "random",
+                "xyz",
+                "ua",
+                "uk",
+                "gg",
+                "io",
+                "ai",
+                "com",
+                selected?.name ?? "random",
+              ]),
+            ]
+              .map((name) => zones.find((z) => z.name === name))
+              .filter((z) => !!z)
+              .map((z) => (
+                <button
+                  type="button"
+                  key={z.name}
+                  aria-pressed={selected?.name === z.name}
+                  className={selected?.name === z.name ? "active" : ""}
+                  disabled={locked || !!state.pending || !!state.scanner}
+                  onClick={() => choose(z.name)}
+                >
+                  {z.name === "random" ? "RANDOM" : "." + z.name}
+                  {selected?.name === z.name && (
+                    <small>{number(z.spinPrice)}</small>
+                  )}
+                </button>
+              ))}
             <button
-              className="primary"
-              disabled={busy}
-              onClick={() => act("/drop/ack", { id: state.pending!.id })}
+              type="button"
+              aria-expanded={allZones}
+              disabled={locked || !!state.pending || !!state.scanner}
+              onClick={() => setAllZones(!allZones)}
             >
-              Продолжить
+              ALL TLD
             </button>
           </div>
-        ) : (
-          <div className="decrypt-result-actions">
-            <div className="result-actions">
-              <button
-                className="primary"
-                disabled={locked}
-                onClick={() =>
-                  act("/domain", { id: state.pending!.id, action: "keep" })
-                }
-              >
-                <Check size={18} /> Оставить
-              </button>
-              <button
-                className="secondary"
-                disabled={locked}
-                onClick={() =>
-                  act("/domain", { id: state.pending!.id, action: "sell" })
-                }
-              >
-                Продать · {number(state.pending.value)}
-              </button>
-            </div>
-            <button
-              className="reroll"
-              disabled={locked || (!p.reroll_available && !p.reroll_tokens)}
-              onClick={() => act("/reroll", {}, true)}
-            >
-              <RefreshCw size={15} />
-              {p.reroll_available
-                ? "FREE RE-ROLL 1/1"
-                : p.reroll_tokens
-                  ? "RE-ROLL TOKEN · " + p.reroll_tokens
-                  : "FREE RE-ROLL 0/1"}
-            </button>
-          </div>
-        )
-      ) : (
-        <div className="spin-controls decrypt-controls">
-          <button
-            className="primary spin-button"
-            disabled={
-              locked ||
-              !state.systems.flags.spin ||
-              !!state.scanner ||
-              !selected ||
-              (!p.free_spin && p.coins < selected.spinPrice)
-            }
-            onClick={() =>
-              selected && act("/spin", { tld: selected.name }, true)
-            }
-          >
-            <Zap size={20} />
-            {deficit > 0
-              ? "НУЖНО ЕЩЁ " + number(deficit) + " COINS"
-              : p.free_spin
-                ? "SPIN — FREE"
-                : selected
-                  ? "SPIN — " + number(selected.spinPrice)
-                  : "SPIN"}
-            <ArrowRight size={18} />
-          </button>
-          {state.scanner && (
-            <button className="text-button" onClick={onScanner}>
-              Завершить открытый Scanner
-            </button>
+          {allZones && (
+            <ZoneSheet
+              zones={zones}
+              selected={selected?.name ?? "random"}
+              onChoose={choose}
+              onClose={() => setAllZones(false)}
+            />
           )}
         </div>
-      )}
-    </section>
+        <CardDecryption
+          selectedZone={selected?.name ?? "random"}
+          result={state.pending}
+          previous={previous}
+          animating={rolling}
+          waiting={busy && !rolling && !state.pending}
+          fast={fast}
+          sound={sound}
+          specialSound={specialSound}
+          highValueThreshold={
+            (selected?.spinPrice ?? state.config.spinPrice) * 20
+          }
+          onDone={onDone}
+          onDetails={onDetails}
+        />
+        <div
+          className={
+            "compact-luck " +
+            ((selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
+              ? "quiet"
+              : "")
+          }
+          aria-label={`Luck: ${selected?.pity ?? 0} из ${state.config.pityGuarantee}`}
+        >
+          <span>
+            {(selected?.pity ?? 0) < Math.max(0, state.config.pityStart - 2)
+              ? "LUCK"
+              : (selected?.pity ?? 0) >= state.config.pityGuarantee - 1
+                ? "RARE+ ГАРАНТИРОВАН"
+                : (selected?.pity ?? 0) >= state.config.pityGuarantee - 4
+                  ? "RARE+ CLOSE"
+                  : (selected?.pity ?? 0) >= state.config.pityStart
+                    ? "LUCK +" +
+                      Math.max(
+                        0,
+                        Math.round(
+                          ((selected?.rareChance ?? 0) -
+                            (selected?.baseRareChance ?? 0)) *
+                            100,
+                        ),
+                      ) +
+                      "%"
+                    : "LUCK BUILDING"}
+          </span>
+          <progress
+            max={state.config.pityGuarantee}
+            value={selected?.pity ?? 0}
+          />
+        </div>
+        <div className="spin-honor-slot">
+          {state.pending && !rolling && (
+            <>
+              {" "}
+              <div className="drop-honors">
+                {state.pending.discovery?.globalRecord && (
+                  <strong>NEW GLOBAL RECORD · #1 ALL TIME</strong>
+                )}
+                {state.pending.discovery?.personalBest && (
+                  <span>
+                    NEW PERSONAL BEST ·{" "}
+                    {number(state.pending.discovery.oldPersonal ?? 0)} →{" "}
+                    {number(state.pending.value)}
+                  </span>
+                )}
+                {state.pending.discovery?.firstFound && (
+                  <strong>
+                    FIRST FOUND · Ты первым обнаружил {state.pending.name}.
+                    {state.pending.tld} с запуска Serial
+                  </strong>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        <div className="spin-action-slot">
+          {state.pending && !rolling ? (
+            state.pending.quick_sold ? (
+              <div className="quick-sold">
+                <h3>QUICK SOLD</h3>
+                <p>+{number(state.pending.value)} coins</p>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={() => act("/drop/ack", { id: state.pending!.id })}
+                >
+                  Продолжить
+                </button>
+              </div>
+            ) : (
+              <div className="decrypt-result-actions">
+                <div className="result-actions">
+                  <button
+                    className="primary"
+                    disabled={locked}
+                    onClick={() =>
+                      act("/domain", { id: state.pending!.id, action: "keep" })
+                    }
+                  >
+                    <Check size={18} /> Оставить
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={locked}
+                    onClick={() =>
+                      act("/domain", { id: state.pending!.id, action: "sell" })
+                    }
+                  >
+                    Продать · {number(state.pending.value)}
+                  </button>
+                </div>
+                <button
+                  className="reroll"
+                  disabled={locked || (!p.reroll_available && !p.reroll_tokens)}
+                  onClick={() => act("/reroll", {}, true)}
+                >
+                  <RefreshCw size={15} />
+                  {p.reroll_available
+                    ? "FREE RE-ROLL 1/1"
+                    : p.reroll_tokens
+                      ? "RE-ROLL TOKEN · " + p.reroll_tokens
+                      : "FREE RE-ROLL 0/1"}
+                </button>
+              </div>
+            )
+          ) : (
+            <div className="spin-controls decrypt-controls">
+              <button
+                className="primary spin-button"
+                disabled={
+                  locked ||
+                  !state.systems.flags.spin ||
+                  !!state.scanner ||
+                  !selected ||
+                  (!p.free_spin && p.coins < selected.spinPrice)
+                }
+                onClick={() =>
+                  selected && act("/spin", { tld: selected.name }, true)
+                }
+              >
+                <Zap size={20} />
+                {deficit > 0
+                  ? "НУЖНО ЕЩЁ " + number(deficit) + " COINS"
+                  : p.free_spin
+                    ? "SPIN — FREE"
+                    : selected
+                      ? "SPIN — " + number(selected.spinPrice)
+                      : "SPIN"}
+                <ArrowRight size={18} />
+              </button>
+              {state.scanner && (
+                <button className="text-button" onClick={onScanner}>
+                  Завершить открытый Scanner
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+      <RecentDrops
+        refresh={refresh}
+        paused={rolling || busy}
+        onDomain={onDomain}
+      />
+    </>
   );
 }
